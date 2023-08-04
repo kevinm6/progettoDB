@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile</title>
+    <link rel="icon" href="../public/images/logopurple.png" type="image/x-icon">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-KK94CHFLLe+nY2dmCWGMq91rCGa5gtU4mk92HdvYe+M/SXH301p5ILy+dN9+nJOZ" crossorigin="anonymous">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="./css/default.css">
+</head>
+
+<body>
+    <div id="menu"></div>
+
+    <div class="container">
+        <div class="mb-3">
+            <label for="nickname" class="form-label">Nickname</label>
+            <div class="input-group">
+                <input id="nickname" type="text" class="form-control" readonly>
+                <button class="btn btn-outline-secondary" type="button" id="editNickname">
+                    <i class="bi bi-pencil"></i>
+                </button>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label for="email" class="form-label">Email address</label>
+            <div class="input-group">
+                <input id="email" type="email" class="form-control" readonly>
+                <button class="btn btn-outline-secondary" type="button" id="editEmail">
+                    <i class="bi bi-pencil"></i>
+                </button>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <div class="input-group">
+                <input id="password" type="password" class="form-control" readonly>
+                <button class="btn btn-outline-secondary" type="button" id="editPassword">
+                    <i class="bi bi-pencil"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label for="nome" class="form-label">Name</label>
+            <div class="input-group">
+                <input id="nome" type="text" class="form-control" readonly>
+                <button class="btn btn-outline-secondary" type="button" id="editName">
+                    <i class="bi bi-pencil"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label for="cognome" class="form-label">Surname</label>
+            <div class="input-group">
+                <input id="cognome" type="text" class="form-control" readonly>
+                <button class="btn btn-outline-secondary" type="button" id="editSurname">
+                    <i class="bi bi-pencil"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label for="genres" class="form-label">Gusti Musicali</label>
+            <input id="genres" type="text" class="form-control" readonly>
+        </div>
+        <div class="mb-3">
+            <label for="date" class="form-label">Birth Date</label>
+            <input id="date" type="text" class="form-control" readonly>
+        </div>
+        <button class="btn btn-primary" onclick="logout()">Logout</button>
+        <button class="btn btn-primary" id="saveChangesButton" onclick="saveChanges()" disabled>Save changes</button>
+        <button class="btn btn-danger" id="saveChangesButton" onclick="deleteUser()">Delete Profile</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-ENjdO4Dr2bkBIFxQpeoTz1HIcje39Wm4jDKdf19U8gI4ddQ3GYNS7NTKfAdVQSZe"
+        crossorigin="anonymous"></script>
+    <script src="src/html/scripts/menu.js"></script>
+    <script src="scripts/scripts.js"></script>
+    <script src="scripts/profile.js"></script>
+    <script>
+        // Funzione per abilitare la modifica di una textbox
+        function enableEdit(inputField) {
+            document.getElementById("saveChangesButton").disabled = false;
+            inputField.removeAttribute("readonly");
+            inputField.focus();
+            document.getElementById("saveChangesButton").classList.remove("d-none");
+        }
+
+        // Aggiungi eventi ai bottoni di modifica
+        document.getElementById("editNickname").addEventListener("click", function () {
+            enableEdit(document.getElementById("nickname"));
+        });
+
+        document.getElementById("editEmail").addEventListener("click", function () {
+            enableEdit(document.getElementById("email"));
+        });
+
+        document.getElementById("editPassword").addEventListener("click", function () {
+            enableEdit(document.getElementById("password"));
+        });
+        document.getElementById("editName").addEventListener("click", function () {
+            enableEdit(document.getElementById("nome"));
+        });
+        document.getElementById("editSurname").addEventListener("click", function () {
+            enableEdit(document.getElementById("cognome"));
+        });
+
+    </script>
+
+    <script>
+        async function authandpopulate() {
+            try {
+                const userData = await authenticateUser();
+                if (userData == "ERR") {
+                    console.error("Errore durante l'autenticazione:", error);
+                    alert("Errore durante l'autenticazione, rifare il login");
+                    logout();
+                    throw error;
+                } else if (userData == "ERR_NOT_LOGGED") {
+                    alert("Effettua il login per accedere al profilo");
+                    window.location.href = "/login";
+                    throw new Error("Utente non loggato");
+                } else {
+                    populateUserProfile(userData);
+                }
+            } catch (error) {
+                console.error("Errore durante l'esecuzione:", error);
+            }
+        }
+        authandpopulate();
+    </script>
+    <div class="spacer"></div>
+    <footer id="footer"></footer>
+    <script type="module" src="../html/scripts/footer.js"></script>
+</body>
+
+</html>

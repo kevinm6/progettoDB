@@ -1,0 +1,1327 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 14.11 (Homebrew)
+-- Dumped by pg_dump version 14.11 (Homebrew)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: project; Type: SCHEMA; Schema: -; Owner: Kevin
+--
+
+CREATE SCHEMA project;
+
+
+ALTER SCHEMA project OWNER TO "Kevin";
+
+--
+-- Name: tipologia_cdl; Type: DOMAIN; Schema: public; Owner: Kevin
+--
+
+CREATE DOMAIN public.tipologia_cdl AS character varying(10)
+	CONSTRAINT tipologia_cdl_check CHECK (((VALUE)::text = ANY ((ARRAY['triennale'::character varying, 'magistrale'::character varying])::text[])));
+
+
+ALTER DOMAIN public.tipologia_cdl OWNER TO "Kevin";
+
+--
+-- Name: tipologia_corso; Type: DOMAIN; Schema: public; Owner: Kevin
+--
+
+CREATE DOMAIN public.tipologia_corso AS character varying(10)
+	CONSTRAINT tipologia_corso_check CHECK (((VALUE)::text = ANY ((ARRAY['triennale'::character varying, 'magistrale'::character varying])::text[])));
+
+
+ALTER DOMAIN public.tipologia_corso OWNER TO "Kevin";
+
+--
+-- Name: userprofile; Type: DOMAIN; Schema: public; Owner: Kevin
+--
+
+CREATE DOMAIN public.userprofile AS character varying(10)
+	CONSTRAINT userprofile_check CHECK (((VALUE)::text = ANY ((ARRAY['segreteria'::character varying, 'docente'::character varying, 'studente'::character varying])::text[])));
+
+
+ALTER DOMAIN public.userprofile OWNER TO "Kevin";
+
+--
+-- Name: check_iscrizione_esame(); Type: FUNCTION; Schema: public; Owner: Kevin
+--
+
+CREATE FUNCTION public.check_iscrizione_esame() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+  if exists (
+    select 1 from iscrizione_esame
+    where data = new.data
+      and insegnamento = new.insegnamento
+      and cdl = new.cdl
+      and studente = new.studente
+  ) then
+    delete from iscrizione_esame
+    where data = new.data
+      and insegnamento = new.insegnamento
+      and cdl = new.cdl
+      and studente = new.studente;
+  else
+    raise exception 'Nessuna iscrizione trovata per esame.';
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.check_iscrizione_esame() OWNER TO "Kevin";
+
+--
+-- Name: check_students_dups(); Type: FUNCTION; Schema: public; Owner: Kevin
+--
+
+CREATE FUNCTION public.check_students_dups() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+    if exists (
+        select 1 from storico_studente where matricola = new.matricola
+    ) then
+        raise exception 'impossibile inserire: matricola gia'' presente in storico_studente.';
+    end if;
+    return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.check_students_dups() OWNER TO "Kevin";
+
+--
+-- Name: check_valid_date(); Type: FUNCTION; Schema: public; Owner: Kevin
+--
+
+CREATE FUNCTION public.check_valid_date() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+    if new.data < current_date then
+        raise exception 'impossibile inserire un esame con data precedente alla data odierna';
+    end if;
+    return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.check_valid_date() OWNER TO "Kevin";
+
+--
+-- Name: entry_studente_storico(); Type: FUNCTION; Schema: public; Owner: Kevin
+--
+
+CREATE FUNCTION public.entry_studente_storico() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+  insert into studente_storico (matricola, cdl, nome, cognome, email)
+  values (old.matricola, old.cdl, old.nome, old.cognome, old.email);
+  return old;
+end;
+$$;
+
+
+ALTER FUNCTION public.entry_studente_storico() OWNER TO "Kevin";
+
+--
+-- Name: hash_password(); Type: FUNCTION; Schema: public; Owner: Kevin
+--
+
+CREATE FUNCTION public.hash_password() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+  new.password := md5(new.password);
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.hash_password() OWNER TO "Kevin";
+
+--
+-- Name: inserimento_storico_carriera(); Type: FUNCTION; Schema: public; Owner: Kevin
+--
+
+CREATE FUNCTION public.inserimento_storico_carriera() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+    insert into carriera_storico (data, insegnamento, cdl, studente, voto, esito)
+    values (old.data, old.insegnamento, old.cdl, old.studente, old.voto, old.esito);
+    return old;
+end;
+$$;
+
+
+ALTER FUNCTION public.inserimento_storico_carriera() OWNER TO "Kevin";
+
+--
+-- Name: inserimento_storico_studente(); Type: FUNCTION; Schema: public; Owner: Kevin
+--
+
+CREATE FUNCTION public.inserimento_storico_studente() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+    insert into studente_storico (matricola, cdl, nome, cognome, e_mail)
+    values (old.matricola, old.cdl, old.nome, old.cognome, old.e_mail);
+    return old;
+end;
+$$;
+
+
+ALTER FUNCTION public.inserimento_storico_studente() OWNER TO "Kevin";
+
+--
+-- Name: limite_docente_responsabile_corsi(); Type: FUNCTION; Schema: public; Owner: Kevin
+--
+
+CREATE FUNCTION public.limite_docente_responsabile_corsi() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+  if exists (
+    select 1 from corso_di_laurea
+    where responsabile = new.responsabile
+    and id != new.id
+  ) then raise exception 'Un docente può avere al massimo 3 insegnamenti di cui è responsabile';
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.limite_docente_responsabile_corsi() OWNER TO "Kevin";
+
+--
+-- Name: verifica_data_esami_univoca(); Type: FUNCTION; Schema: public; Owner: Kevin
+--
+
+CREATE FUNCTION public.verifica_data_esami_univoca() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+    if exists (
+        select 1
+        from esame
+        where corso_di_laurea = new.corso_di_laurea
+          and data = new.data
+    ) then
+        raise notice 'non è possibile inserire un record con la stessa data e corso di laurea.';
+    end if;
+    return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.verifica_data_esami_univoca() OWNER TO "Kevin";
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: carriera; Type: TABLE; Schema: public; Owner: Kevin
+--
+
+CREATE TABLE public.carriera (
+    cdl integer NOT NULL,
+    insegnamento integer NOT NULL,
+    data date NOT NULL,
+    studente integer NOT NULL,
+    voto smallint NOT NULL,
+    esito character varying(8) GENERATED ALWAYS AS (
+CASE
+    WHEN (voto >= 18) THEN 'superato'::text
+    ELSE 'respinto'::text
+END) STORED,
+    CONSTRAINT carriera_voto_check CHECK (((voto >= 0) AND (voto <= 30)))
+);
+
+
+ALTER TABLE public.carriera OWNER TO "Kevin";
+
+--
+-- Name: carriera_ok; Type: VIEW; Schema: public; Owner: Kevin
+--
+
+CREATE VIEW public.carriera_ok AS
+ SELECT c.studente,
+    c.insegnamento,
+    c.cdl,
+    c.data,
+    c.voto,
+    c.esito
+   FROM public.carriera c
+  WHERE (((c.esito)::text = 'superato'::text) AND (c.data = ( SELECT max(c_alt.data) AS max
+           FROM public.carriera c_alt
+          WHERE ((c_alt.insegnamento = c.insegnamento) AND (c_alt.cdl = c.cdl) AND (c_alt.studente = c.studente)))));
+
+
+ALTER TABLE public.carriera_ok OWNER TO "Kevin";
+
+--
+-- Name: carriera_storico; Type: TABLE; Schema: public; Owner: Kevin
+--
+
+CREATE TABLE public.carriera_storico (
+    cdl integer NOT NULL,
+    insegnamento integer NOT NULL,
+    data date NOT NULL,
+    studente integer NOT NULL,
+    voto smallint NOT NULL,
+    esito character varying(8),
+    CONSTRAINT carriera_storico_voto_check CHECK (((voto >= 0) AND (voto <= 30)))
+);
+
+
+ALTER TABLE public.carriera_storico OWNER TO "Kevin";
+
+--
+-- Name: carriera_ok_studenti_rimossi; Type: VIEW; Schema: public; Owner: Kevin
+--
+
+CREATE VIEW public.carriera_ok_studenti_rimossi AS
+ SELECT c.studente,
+    c.insegnamento,
+    c.cdl,
+    c.data,
+    c.voto,
+    c.esito
+   FROM public.carriera_storico c
+  WHERE (((c.esito)::text = 'promosso'::text) AND (c.data = ( SELECT max(c1.data) AS max
+           FROM public.carriera_storico c1
+          WHERE ((c1.insegnamento = c.insegnamento) AND (c1.cdl = c.cdl) AND (c1.studente = c.studente)))));
+
+
+ALTER TABLE public.carriera_ok_studenti_rimossi OWNER TO "Kevin";
+
+--
+-- Name: carriera_valida_studenti_rimossi; Type: VIEW; Schema: public; Owner: Kevin
+--
+
+CREATE VIEW public.carriera_valida_studenti_rimossi AS
+ SELECT c.studente,
+    c.insegnamento,
+    c.cdl,
+    c.data,
+    c.voto,
+    c.esito
+   FROM public.carriera_storico c
+  WHERE (((c.esito)::text = 'promosso'::text) AND (c.data = ( SELECT max(c1.data) AS max
+           FROM public.carriera_storico c1
+          WHERE ((c1.insegnamento = c.insegnamento) AND (c1.cdl = c.cdl) AND (c1.studente = c.studente)))));
+
+
+ALTER TABLE public.carriera_valida_studenti_rimossi OWNER TO "Kevin";
+
+--
+-- Name: carriere; Type: VIEW; Schema: public; Owner: Kevin
+--
+
+CREATE VIEW public.carriere AS
+ SELECT c.studente,
+    c.insegnamento,
+    c.cdl,
+    c.data,
+    c.voto,
+    c.esito
+   FROM public.carriera c
+  WHERE (((c.esito)::text = 'superato'::text) AND (c.data = ( SELECT max(c_alt.data) AS max
+           FROM public.carriera c_alt
+          WHERE ((c_alt.insegnamento = c.insegnamento) AND (c_alt.cdl = c.cdl) AND (c_alt.studente = c.studente)))));
+
+
+ALTER TABLE public.carriere OWNER TO "Kevin";
+
+--
+-- Name: corso_di_laurea; Type: TABLE; Schema: public; Owner: Kevin
+--
+
+CREATE TABLE public.corso_di_laurea (
+    id integer NOT NULL,
+    responsabile integer NOT NULL,
+    tipologia public.tipologia_cdl NOT NULL,
+    nome character varying(32) NOT NULL
+);
+
+
+ALTER TABLE public.corso_di_laurea OWNER TO "Kevin";
+
+--
+-- Name: corso_di_laurea_id_seq; Type: SEQUENCE; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE public.corso_di_laurea ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.corso_di_laurea_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: docente; Type: TABLE; Schema: public; Owner: Kevin
+--
+
+CREATE TABLE public.docente (
+    id integer NOT NULL,
+    utente character varying(20) NOT NULL,
+    nome character varying(20),
+    cognome character varying(20),
+    email character varying(30) NOT NULL
+);
+
+
+ALTER TABLE public.docente OWNER TO "Kevin";
+
+--
+-- Name: docente_id_seq; Type: SEQUENCE; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE public.docente ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.docente_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: esame; Type: TABLE; Schema: public; Owner: Kevin
+--
+
+CREATE TABLE public.esame (
+    cdl integer NOT NULL,
+    insegnamento integer NOT NULL,
+    data date NOT NULL
+);
+
+
+ALTER TABLE public.esame OWNER TO "Kevin";
+
+--
+-- Name: insegnamento; Type: TABLE; Schema: public; Owner: Kevin
+--
+
+CREATE TABLE public.insegnamento (
+    codice_univoco integer NOT NULL,
+    cdl integer NOT NULL,
+    responsabile integer NOT NULL,
+    nome character varying(40) NOT NULL,
+    descrizione text,
+    anno smallint NOT NULL,
+    CONSTRAINT insegnamento_anno_check CHECK (((anno > 0) AND (anno < 4)))
+);
+
+
+ALTER TABLE public.insegnamento OWNER TO "Kevin";
+
+--
+-- Name: insegnamento_codice_univoco_seq; Type: SEQUENCE; Schema: public; Owner: Kevin
+--
+
+CREATE SEQUENCE public.insegnamento_codice_univoco_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.insegnamento_codice_univoco_seq OWNER TO "Kevin";
+
+--
+-- Name: insegnamento_codice_univoco_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: Kevin
+--
+
+ALTER SEQUENCE public.insegnamento_codice_univoco_seq OWNED BY public.insegnamento.codice_univoco;
+
+
+--
+-- Name: iscrizione_esame; Type: TABLE; Schema: public; Owner: Kevin
+--
+
+CREATE TABLE public.iscrizione_esame (
+    cdl integer NOT NULL,
+    insegnamento integer NOT NULL,
+    data date NOT NULL,
+    studente integer NOT NULL
+);
+
+
+ALTER TABLE public.iscrizione_esame OWNER TO "Kevin";
+
+--
+-- Name: propedeuticita; Type: TABLE; Schema: public; Owner: Kevin
+--
+
+CREATE TABLE public.propedeuticita (
+    cdl_main integer NOT NULL,
+    cdl_dep integer NOT NULL,
+    insegnamento integer NOT NULL,
+    propedeutico_a integer NOT NULL,
+    CONSTRAINT propedeuticita_check CHECK ((cdl_main = cdl_dep)),
+    CONSTRAINT propedeuticita_check1 CHECK ((insegnamento <> propedeutico_a))
+);
+
+
+ALTER TABLE public.propedeuticita OWNER TO "Kevin";
+
+--
+-- Name: segreteria; Type: TABLE; Schema: public; Owner: Kevin
+--
+
+CREATE TABLE public.segreteria (
+    id integer NOT NULL,
+    utente character varying(20) NOT NULL,
+    nome character varying(20),
+    cognome character varying(20)
+);
+
+
+ALTER TABLE public.segreteria OWNER TO "Kevin";
+
+--
+-- Name: segreteria_id_seq; Type: SEQUENCE; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE public.segreteria ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.segreteria_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: studente; Type: TABLE; Schema: public; Owner: Kevin
+--
+
+CREATE TABLE public.studente (
+    matricola integer NOT NULL,
+    cdl integer NOT NULL,
+    utente character varying(20) NOT NULL,
+    nome character varying(20),
+    cognome character varying(20),
+    email character varying(30)
+);
+
+
+ALTER TABLE public.studente OWNER TO "Kevin";
+
+--
+-- Name: studente_matricola_seq; Type: SEQUENCE; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE public.studente ALTER COLUMN matricola ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.studente_matricola_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: studente_storico; Type: TABLE; Schema: public; Owner: Kevin
+--
+
+CREATE TABLE public.studente_storico (
+    matricola integer NOT NULL,
+    cdl integer NOT NULL,
+    nome character varying(20),
+    cognome character varying(20),
+    email character varying(30)
+);
+
+
+ALTER TABLE public.studente_storico OWNER TO "Kevin";
+
+--
+-- Name: utente; Type: TABLE; Schema: public; Owner: Kevin
+--
+
+CREATE TABLE public.utente (
+    nome_utente character varying(20) NOT NULL,
+    password text NOT NULL,
+    profilo_utente public.userprofile NOT NULL
+);
+
+
+ALTER TABLE public.utente OWNER TO "Kevin";
+
+--
+-- Name: insegnamento codice_univoco; Type: DEFAULT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.insegnamento ALTER COLUMN codice_univoco SET DEFAULT nextval('public.insegnamento_codice_univoco_seq'::regclass);
+
+
+--
+-- Data for Name: carriera; Type: TABLE DATA; Schema: public; Owner: Kevin
+--
+
+COPY public.carriera (cdl, insegnamento, data, studente, voto) FROM stdin;
+1	1	2024-02-27	1	20
+9	22	2024-03-26	43	16
+\.
+
+
+--
+-- Data for Name: carriera_storico; Type: TABLE DATA; Schema: public; Owner: Kevin
+--
+
+COPY public.carriera_storico (cdl, insegnamento, data, studente, voto, esito) FROM stdin;
+\.
+
+
+--
+-- Data for Name: corso_di_laurea; Type: TABLE DATA; Schema: public; Owner: Kevin
+--
+
+COPY public.corso_di_laurea (id, responsabile, tipologia, nome) FROM stdin;
+1	1	triennale	Informatica
+2	2	triennale	Ingegneria Civile
+3	3	magistrale	Economia Aziendale
+4	3	triennale	Scienze dell Educazione
+5	4	magistrale	Giurisprudenza
+6	5	triennale	Comunicazione Digitale
+7	6	magistrale	Psicologia Clinica
+8	7	triennale	Lingue e Letterature Straniere
+9	9	triennale	Scienze Politiche
+10	10	magistrale	Ingegneria Biomedica
+\.
+
+
+--
+-- Data for Name: docente; Type: TABLE DATA; Schema: public; Owner: Kevin
+--
+
+COPY public.docente (id, utente, nome, cognome, email) FROM stdin;
+1	docente01	Giovanni	Rossi	giovanni.rossi@docente.it
+2	docente02	Chiara	Müller	chiara.müller@docente.it
+3	docente03	Marco	Conti	marco.conti@docente.it
+4	docente04	Sofia	Nguyen	sofia.nguyen@docente.it
+5	docente05	Alessandro	Moretti	alessandro.moretti@docente.it
+6	docente06	Francesca	Lopez	francesca.lopez@docente.it
+7	docente07	Matteo	De Luca	matteo.de_luca@docente.it
+8	docente08	Giorgia	Schmidt	giorgia.schmidt@docente.it
+9	docente09	Luca	Colombo	luca.colombo@docente.it
+10	docente10	Martina	Dubois	martina.dubois@docente.it
+11	docente11	Federico	Santoro	federico.santoro@docente.it
+12	docente12	Valentina	Petrov	valentina.petrov@docente.it
+13	docente13	Lorenzo	Ferrari	lorenzo.ferrari@docente.it
+14	docente14	Eleonora	González	eleonora.gonzález@docente.it
+15	docente15	Antonio	Marchetti	antonio.marchetti@docente.it
+16	docente16	Sara	Patel	sara.patel@docente.it
+17	docente17	Stefano	De Angelis	stefano.de_angelis@docente.it
+18	docente18	Aurora	Jensen	aurora.jensen@docente.it
+19	docente19	Andrea	Greco	andrea.greco@docente.it
+20	docente20	Giulia	Kim	giulia.kim@docente.it
+21	docente21	Paolo	Monti	paolo.monti@docente.it
+22	docente22	Elena	Kowalski	elena.kowalski@docente.it
+23	docente23	Simone	Rizzo	simone.rizzo@docente.it
+24	docente24	Laura	Lindberg	laura.lindberg@docente.it
+25	docente25	Davide	Lombardo	davide.lombardo@docente.it
+\.
+
+
+--
+-- Data for Name: esame; Type: TABLE DATA; Schema: public; Owner: Kevin
+--
+
+COPY public.esame (cdl, insegnamento, data) FROM stdin;
+1	1	2024-02-27
+4	9	2024-02-29
+4	9	2024-02-26
+2	30	2024-02-26
+3	29	2024-02-27
+9	22	2024-03-26
+1	1	2024-02-28
+\.
+
+
+--
+-- Data for Name: insegnamento; Type: TABLE DATA; Schema: public; Owner: Kevin
+--
+
+COPY public.insegnamento (codice_univoco, cdl, responsabile, nome, descrizione, anno) FROM stdin;
+1	1	1	Programmazione	Studio e sviluppo tecniche base di programmazione	1
+4	2	3	Fisica	Studio della scienza dei fenomeni naturali	1
+6	3	3	Marketing	Analisi e comprensione di un mercato di riferimento	2
+8	4	3	Didattica Generale	Studio delle teorie, metodi e strategie didattiche	1
+12	5	3	Diritto Amministrativo	Sutdio delle norme che disciplinano le attività della pubblica amministrazione	2
+13	5	3	Diritto Commerciale	Studio delle norme che disciplinano le attività commerciali e imprenditoriali	3
+17	7	3	Psicopatologia	Studio delle principali condizioni psicopatologiche, sintomi e cause	2
+18	7	3	Neuropsicologia	Studio delle basi neurobiologiche dei processi cognitivi e comportamentali	3
+19	8	1	Glottologia	Studio scientifico delle lingue	1
+20	8	1	Letteratura Italiana	Studio e sviluppo della lingua italiana	2
+21	8	1	Letteratura Inglese	Studio e sviluppo della lingua inglese	3
+2	1	1	Basi di Dati	Studio e gestione di basi di dati	2
+3	1	1	Ingegneria Software	Studio e sviluppo delle tecniche di sviluppo software	3
+5	2	6	Scienza delle Costruzioni	Studio e creazione dei modelli fisico-matematici delle strutture	2
+7	3	1	Diritto Tributario	Studio e organizzazione del diritto che si occupa di ogni genere di tributi	3
+9	4	2	Pedagogia Sociale	Analisi delle dinamiche e strategie educative	2
+10	4	2	Educazione Interculturale	Analisi delle opportunità legate alla diversità culturale	3
+11	5	2	Diritto Civile	Studio dei principi fondamentali del diritto civile	1
+15	6	7	Social Media Marketing	Studio delle strategie e tattiche di marketing	2
+16	7	2	Fondamenti della Psicologia	Introduzione e studio dei principi fondamentali della psicologia	1
+22	9	2	Teoria Politica	Studio delle principali teorie politiche e concetti di analisi politica	1
+23	9	5	Politica Internazionale	Studio delle relazioni internazionali, delle dinamiche geopolitiche e sfide globali	2
+24	9	7	Politiche Pubbliche	Studio delle politiche pubbliche, sociali, economiche e ambientali	3
+25	10	8	Biologia Cellulare e Molecolare	Studio delle basi biologiche della vita a livello cellulare e molecolare	1
+26	10	2	Strumentazione Biomedica	Studio dei principi e delle tecniche di progettazione e sviluppo degli strumenti	3
+27	10	9	Anatomia e Fisiologia Umana	Studio anatomia e fisiologia corpo umano	2
+28	6	9	Digital Analytics	Studio sulle metodologie e strumenti per analisi dati digitali	3
+29	3	9	Economia Politica	Studio dei metodi per utilizzo di poche risorse per soddisfare molte esigenze	1
+30	2	9	Tecnica del cantiere	Studio organizzazione e coordinamento	3
+14	6	9	Web Design & User Experience	Studio tecniche di progettazione e sviluppo di siti web	1
+\.
+
+
+--
+-- Data for Name: iscrizione_esame; Type: TABLE DATA; Schema: public; Owner: Kevin
+--
+
+COPY public.iscrizione_esame (cdl, insegnamento, data, studente) FROM stdin;
+1	1	2024-02-27	1
+\.
+
+
+--
+-- Data for Name: propedeuticita; Type: TABLE DATA; Schema: public; Owner: Kevin
+--
+
+COPY public.propedeuticita (cdl_main, cdl_dep, insegnamento, propedeutico_a) FROM stdin;
+1	1	1	3
+3	3	7	6
+3	3	6	7
+\.
+
+
+--
+-- Data for Name: segreteria; Type: TABLE DATA; Schema: public; Owner: Kevin
+--
+
+COPY public.segreteria (id, utente, nome, cognome) FROM stdin;
+1	segreteria01	Luca	Rossi
+2	segreteria02	Martina	Bianchi
+3	segreteria03	Alessandro	Conti
+4	segreteria04	Giulia	Russo
+5	segreteria05	Marco	Esposito
+6	segreteria06	Sofia	Moretti
+7	segreteria07	Francesco	Romano
+8	segreteria08	Chiara	De Luca
+9	segreteria09	Matteo	Ferri
+10	segreteria10	Elena	Colombo
+11	segreteria11	Federico	Martini
+12	segreteria12	Valentina	Santoro
+26	admin	admin	admin
+\.
+
+
+--
+-- Data for Name: studente; Type: TABLE DATA; Schema: public; Owner: Kevin
+--
+
+COPY public.studente (matricola, cdl, utente, nome, cognome, email) FROM stdin;
+1	1	studente01	Luca	Rossi	luca.rossi@studente.it
+2	1	studente02	Maria	Garcia	maria.garcia@studente.it
+3	1	studente03	Mohammed	Khan	mohammed.khan@studente.it
+4	1	studente04	Chiara	Moretti	chiara.moretti@studente.it
+5	1	studente05	David	Brown	david.brown@studente.it
+6	2	studente06	Alessia	Romano	alessia.romano@studente.it
+7	2	studente07	Giovanni	De Luca	giovanni.deluca@studente.it
+8	2	studente08	Sophia	Müller	sophia.muller@studente.it
+9	2	studente09	Francesco	Esposito	francesco.esposito@studente.it
+10	2	studente10	Mei	Chen	mei.chen@studente.it
+11	2	studente11	Federico	Santoro	federico.santoro@studente.it
+12	2	studente12	Elena	Petrova	elena.petrova@studente.it
+13	2	studente13	Alessandro	Moretti	alessandro.moretti@studente.it
+14	1	studente14	Valentina	Lopez	valentina.lopez@studente.it
+15	1	studente15	Lorenzo	Ferrari	lorenzo.ferrari@studente.it
+16	4	studente16	Anna	Ivanova	anna.ivanova@studente.it
+17	4	studente17	Stefano	De Angelis	stefano.deangelis@studente.it
+18	4	studente18	Martina	Lombardi	martina.lombardi@studente.it
+19	4	studente19	Marco	Conti	marco.conti@studente.it
+20	1	studente20	Sofia	Nguyen	sofia.nguyen@studente.it
+21	1	studente21	Matteo	Greco	matteo.greco@studente.it
+22	7	studente22	Giulia	Kim	giulia.kim@studente.it
+23	3	studente23	Diego	Costa	diego.costa@studente.it
+24	3	studente24	Isabella	Schmidt	isabella.schmidt@studente.it
+25	3	studente25	Alessio	Rizzo	alessio.rizzo@studente.it
+26	3	studente26	Elena	Kowalski	elena.kowalski@studente.it
+27	3	studente27	Luca	Martini	luca.martini@studente.it
+28	3	studente28	Aurora	Dubois	aurora.dubois@studente.it
+29	3	studente29	Andrea	Vitali	andrea.vitali@studente.it
+30	3	studente30	Valeria	Jensen	valeria.jensen@studente.it
+31	3	studente31	Giovanni	Costa	giovanni.costa@studente.it
+32	1	studente32	Anna	Petrov	anna.petrov@studente.it
+33	10	studente33	Francesco	Romano	francesco.romano@studente.it
+34	10	studente34	Emma	Lindberg	emma.lindberg@studente.it
+35	10	studente35	Davide	Lombardo	davide.lombardo@studente.it
+36	10	studente36	Maria	Bianchi	maria.bianchi@studente.it
+37	10	studente37	Antonio	Russo	antonio.russo@studente.it
+38	10	studente38	Giorgia	Müller	giorgia.muller@studente.it
+39	10	studente39	Marco	Esposito	marco.esposito@studente.it
+40	1	studente40	Sofia	González	sofia.gonzalez@studente.it
+41	6	studente41	Matteo	Marchetti	matteo.marchetti@studente.it
+42	1	studente42	Valentina	Dupont	valentina.dupont@studente.it
+43	9	studente43	Giuseppe	Farsi	giuseppe.farsi@studente.it
+44	9	studente44	Alessia	Barbieri	alessia.barbieri@studente.it
+45	9	studente45	Giovanni	Martinez	giovanni.martinez@studente.it
+46	9	studente46	Chiara	Lombardi	chiara.lombardi@studente.it
+47	9	studente47	Luca	Andersen	luca.andersen@studente.it
+48	9	studente48	Laura	Schmidt	laura.schmidt@studente.it
+49	9	studente49	Andrea	Greco	andrea.greco@studente.it
+50	1	studente50	Giulia	Yamamoto	giulia.yamamoto@studente.it
+51	8	studente51	Marco	Patel	marco.patel@studente.it
+52	8	studente52	Sofia	Ivanova	sofia.ivanova@studente.it
+53	8	studente53	Alessandro	Sokolov	alessandro.sokolov@studente.it
+54	8	studente54	Valentina	Nguyen	valentina.nguyen@studente.it
+55	1	studente55	Lorenzo	López	lorenzo.lopez@studente.it
+56	1	studente56	Anna	Petrova	anna.petrova@studente.it
+57	1	studente57	Giovanni	Esposito	giovanni.esposito@studente.it
+58	1	studente58	Chiara	Romano	chiara.romano@studente.it
+59	1	studente59	Marco	Yamamoto	marco.yamamoto@studente.it
+60	10	studente60	Sofia	Martinez	sofia.martinez@studente.it
+61	10	studente61	Alessandro	Dupont	alessandro.dupont@studente.it
+62	10	studente62	Valentina	Rizzo	valentina.rizzo@studente.it
+\.
+
+
+--
+-- Data for Name: studente_storico; Type: TABLE DATA; Schema: public; Owner: Kevin
+--
+
+COPY public.studente_storico (matricola, cdl, nome, cognome, email) FROM stdin;
+\.
+
+
+--
+-- Data for Name: utente; Type: TABLE DATA; Schema: public; Owner: Kevin
+--
+
+COPY public.utente (nome_utente, password, profilo_utente) FROM stdin;
+admin	21232f297a57a5a743894a0e4a801fc3	segreteria
+segreteria01	a2157fd2ca61baaed221233df724612f	segreteria
+segreteria02	ac73094d58ca2d837270ec62cfb433bc	segreteria
+segreteria03	b7e6111a60f4c8922d7d5121a194d398	segreteria
+segreteria04	1e3dd41189109e1cf1e735a64b810183	segreteria
+segreteria05	2e4467b6b918a2f4ddb05f0f213569b4	segreteria
+segreteria06	ca81159a2fa18c3d319d99293a644b83	segreteria
+segreteria07	103d68eeed076910d84a7f6e3dba32ef	segreteria
+segreteria08	0fa3a8a353b615857ff091a581baf21f	segreteria
+segreteria09	604a9bf8fd4efb4eb5f6db03e681c34a	segreteria
+segreteria10	fecbe5326bf04fe43c6481a1a8eab5ba	segreteria
+segreteria11	77580082e3dbac69d84632aafb9734f7	segreteria
+segreteria12	012169b994ebf522f4bbbf99351bd34d	segreteria
+docente01	7fa2bc59c0f12fd178b18ef8e7d383cd	docente
+docente02	25c5dbf8464161b54a781bb4c18e13ea	docente
+docente03	89a9901e6ceb1580a6164e669ee63519	docente
+docente04	0bc6e73777b61a900ba507536dba1ce8	docente
+docente05	add81ee2fbc546b464c5576e1a0af405	docente
+docente06	319fc6333d80b4a71639d3f88b349d1b	docente
+docente07	f25a968e6843e1d2b39253f4a8c07447	docente
+docente08	78363058eabdaf6dd5ccb1c57733f9c9	docente
+docente09	0f52ff6cbdb705f2f4899a98781eebe5	docente
+docente10	ee8f411949bf84f75b38d542f13d061d	docente
+docente11	f1ec3c7b8b1e907793da4bf707cf8fd5	docente
+docente12	a6386173572151dfd0ffcbde214f0486	docente
+docente13	97d147b6ca8f44ccebea67675c1a8069	docente
+docente14	1628a5f16584bab69d6eec946b81e854	docente
+docente15	58df48edf90c5b215fdf65664fcc58ef	docente
+docente16	ce1e1d85f2208edd8fbeb7e67b988436	docente
+docente17	5b11dfc0db4852d3acb004b8095b383d	docente
+docente18	556b1ffc285e44e2622d08f6c1ced786	docente
+docente19	ae45313f77f685fdffdd1095128727f0	docente
+docente20	908dced1b3fa5d79f9cc95b873c0a899	docente
+docente21	64d21cdb32da398c7100cf3a34e7225b	docente
+docente22	5a5a05af0bc8cc576f6c50a7e1f019d5	docente
+docente23	8dfa8ad53b12993c7802505eb3414fd1	docente
+docente24	968ec5db8f02bad39188db9db967b303	docente
+docente25	5e2f61880aa6ca04162783dc2b82dca6	docente
+studente01	29673d17b0f0de51d70523742818c3cb	studente
+studente02	13850b2ab4410fafc8ae7a85e6aa76dc	studente
+studente03	8c0c5b71ab9d7643c47a58bcf85d574e	studente
+studente04	a1bf378f7e9420eee15fe60f87d531c7	studente
+studente05	c8cc38be531fb7587dacda950f66eb69	studente
+studente06	c61ae299aecb47c275b1bb3d1e4e0ef1	studente
+studente07	95ff66fd2f1651fcf1d4c092ab0eddf1	studente
+studente08	c5f08b84c6935a1165c817ada14b9d6a	studente
+studente09	b34660aa168c451771cb1b645b2b06c5	studente
+studente10	79d3d97d210c2b000395724f57acf457	studente
+studente11	00220a82ce42a46004047c06a887a4e8	studente
+studente12	fc0afac8723fbdf07ee758cb19bdc112	studente
+studente13	e27dca11bb60762710a8cf826937f9dc	studente
+studente14	ccea553f8ac675127c7bacc498e74ab4	studente
+studente15	9f01e35cb55670b883d2119f0ce51276	studente
+studente16	bf044d27995c9a5235b590dbb8de3eb4	studente
+studente17	9b374ab078b88e038c1a720f763a861e	studente
+studente18	8ec128d3436e50063042bdac72a42816	studente
+studente19	b39e3aa4749fa5c4f1d068be12d47837	studente
+studente20	b62001e291280eb92df584f450fc37ef	studente
+studente21	62901da15139974835e7ec1bd49bb71c	studente
+studente22	468ab50ff6ca520a42ae8e4792f52ab4	studente
+studente23	84547b101e573495cf0a7ef589c39044	studente
+studente24	a600ce792c7fa222406f5b4cf62d73bd	studente
+studente25	bfc540eba730596161a9fd234132f37d	studente
+studente26	18f3a6bd5412728a6d4d2e436fb9958f	studente
+studente27	c056aadb09c339ad8b64d14bf8cf3f22	studente
+studente28	0c528fed1c4262941a4bcd518f0e3db1	studente
+studente29	3431ae6b0fd770c63b96e925834b66a5	studente
+studente30	a97d1c9026cd68e5f583c1c580f2260a	studente
+studente31	b33cd9a9c08096cf6107af8e32e0138d	studente
+studente32	8061a161d4d2f48fc961c390d33c6dce	studente
+studente33	6118c7ed8e5de1f88634642b8e94671e	studente
+studente34	9c0fcb3a504ea57fa4e2eac8b9b84280	studente
+studente35	702b6ae9f78d594a1a458022060c655f	studente
+studente36	6fb5d56381622585e6b5f1206d180038	studente
+studente37	7602feac3b7155e97281ddd09e30169e	studente
+studente38	4e4bbb3bff35bc0fd897d805bda9ad98	studente
+studente39	952d05771bdd1e22f4961144999a987b	studente
+studente40	ec93f43eb8a36d68c947798300022477	studente
+studente41	7507c091f9337dc17883458a1c992a05	studente
+studente42	f292a89ac4003b6217751d58d1b2e40e	studente
+studente43	b81f860273d4054420c589ce560c3f9b	studente
+studente44	0e5332d6a926e8f9d4cc988ff75aee0c	studente
+studente45	96469237424d8ec1a235c51dbbd1e58f	studente
+studente46	0bd69314db5fa59afe0e350501e16fba	studente
+studente47	8ade71cbb8e28ad822c3901715c7ccf5	studente
+studente48	67f09049cc87701875276411fc003d21	studente
+studente49	71b2baf2081800675f2795de6110bd6b	studente
+studente50	93a66f06fcf52b87f40f63e3dba8d6e0	studente
+studente51	4d721359dbe36fe4ab999c69df750b56	studente
+studente52	dc64bb497f22da85da57c3ad0c53e55a	studente
+studente53	0bf758b67bda54c703931e5b6eacc77d	studente
+studente54	3f0cb1b141e1fb9a9dfb95af48795050	studente
+studente55	3f0e12db9934da0f7a3bff5d53f0d4ef	studente
+studente56	5693dd8152d22198ee790d8d86491a16	studente
+studente57	573bbdb8b69fb961cca3cf8b33d05f47	studente
+studente58	3fc19a10210e6defc40378c312c5e931	studente
+studente59	e192b15518379cdbbb94773a6e75c514	studente
+studente60	a558b8728b8054d18b71dbbbeb90011f	studente
+studente61	202a8e8e32b13593600f42cc3144e648	studente
+studente62	1b6a0b33e8d8eef7f852e9dfdf1209d3	studente
+\.
+
+
+--
+-- Name: corso_di_laurea_id_seq; Type: SEQUENCE SET; Schema: public; Owner: Kevin
+--
+
+SELECT pg_catalog.setval('public.corso_di_laurea_id_seq', 20, true);
+
+
+--
+-- Name: docente_id_seq; Type: SEQUENCE SET; Schema: public; Owner: Kevin
+--
+
+SELECT pg_catalog.setval('public.docente_id_seq', 50, true);
+
+
+--
+-- Name: insegnamento_codice_univoco_seq; Type: SEQUENCE SET; Schema: public; Owner: Kevin
+--
+
+SELECT pg_catalog.setval('public.insegnamento_codice_univoco_seq', 67, true);
+
+
+--
+-- Name: segreteria_id_seq; Type: SEQUENCE SET; Schema: public; Owner: Kevin
+--
+
+SELECT pg_catalog.setval('public.segreteria_id_seq', 26, true);
+
+
+--
+-- Name: studente_matricola_seq; Type: SEQUENCE SET; Schema: public; Owner: Kevin
+--
+
+SELECT pg_catalog.setval('public.studente_matricola_seq', 124, true);
+
+
+--
+-- Name: carriera carriera_pkey; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.carriera
+    ADD CONSTRAINT carriera_pkey PRIMARY KEY (cdl, insegnamento, data, studente);
+
+
+--
+-- Name: carriera_storico carriera_storico_pkey; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.carriera_storico
+    ADD CONSTRAINT carriera_storico_pkey PRIMARY KEY (cdl, insegnamento, data, studente);
+
+
+--
+-- Name: corso_di_laurea corso_di_laurea_nome_tipologia_key; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.corso_di_laurea
+    ADD CONSTRAINT corso_di_laurea_nome_tipologia_key UNIQUE (nome, tipologia);
+
+
+--
+-- Name: corso_di_laurea corso_di_laurea_pkey; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.corso_di_laurea
+    ADD CONSTRAINT corso_di_laurea_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: docente docente_email_key; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.docente
+    ADD CONSTRAINT docente_email_key UNIQUE (email);
+
+
+--
+-- Name: docente docente_pkey; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.docente
+    ADD CONSTRAINT docente_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: docente docente_utente_key; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.docente
+    ADD CONSTRAINT docente_utente_key UNIQUE (utente);
+
+
+--
+-- Name: esame esame_cdl_data_key; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.esame
+    ADD CONSTRAINT esame_cdl_data_key UNIQUE (cdl, data);
+
+
+--
+-- Name: esame esame_pkey; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.esame
+    ADD CONSTRAINT esame_pkey PRIMARY KEY (cdl, insegnamento, data);
+
+
+--
+-- Name: insegnamento insegnamento_cdl_nome_key; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.insegnamento
+    ADD CONSTRAINT insegnamento_cdl_nome_key UNIQUE (cdl, nome);
+
+
+--
+-- Name: insegnamento insegnamento_pkey; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.insegnamento
+    ADD CONSTRAINT insegnamento_pkey PRIMARY KEY (codice_univoco, cdl);
+
+
+--
+-- Name: iscrizione_esame iscrizione_esame_pkey; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.iscrizione_esame
+    ADD CONSTRAINT iscrizione_esame_pkey PRIMARY KEY (cdl, insegnamento, data, studente);
+
+
+--
+-- Name: propedeuticita propedeuticita_pkey; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.propedeuticita
+    ADD CONSTRAINT propedeuticita_pkey PRIMARY KEY (cdl_main, insegnamento, propedeutico_a);
+
+
+--
+-- Name: segreteria segreteria_pkey; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.segreteria
+    ADD CONSTRAINT segreteria_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: segreteria segreteria_utente_key; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.segreteria
+    ADD CONSTRAINT segreteria_utente_key UNIQUE (utente);
+
+
+--
+-- Name: studente studente_email_key; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.studente
+    ADD CONSTRAINT studente_email_key UNIQUE (email);
+
+
+--
+-- Name: studente studente_pkey; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.studente
+    ADD CONSTRAINT studente_pkey PRIMARY KEY (matricola);
+
+
+--
+-- Name: studente_storico studente_storico_email_key; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.studente_storico
+    ADD CONSTRAINT studente_storico_email_key UNIQUE (email);
+
+
+--
+-- Name: studente_storico studente_storico_pkey; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.studente_storico
+    ADD CONSTRAINT studente_storico_pkey PRIMARY KEY (matricola);
+
+
+--
+-- Name: studente studente_utente_key; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.studente
+    ADD CONSTRAINT studente_utente_key UNIQUE (utente);
+
+
+--
+-- Name: utente utente_pkey; Type: CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.utente
+    ADD CONSTRAINT utente_pkey PRIMARY KEY (nome_utente);
+
+
+--
+-- Name: studente avoid_students_dups; Type: TRIGGER; Schema: public; Owner: Kevin
+--
+
+CREATE TRIGGER avoid_students_dups BEFORE INSERT OR UPDATE ON public.studente FOR EACH ROW EXECUTE FUNCTION public.check_students_dups();
+
+
+--
+-- Name: esame block_date_enter; Type: TRIGGER; Schema: public; Owner: Kevin
+--
+
+CREATE TRIGGER block_date_enter BEFORE INSERT OR UPDATE ON public.esame FOR EACH ROW EXECUTE FUNCTION public.check_valid_date();
+
+
+--
+-- Name: utente hash_password_trigger; Type: TRIGGER; Schema: public; Owner: Kevin
+--
+
+CREATE TRIGGER hash_password_trigger BEFORE INSERT OR UPDATE ON public.utente FOR EACH ROW EXECUTE FUNCTION public.hash_password();
+
+
+--
+-- Name: carriera inserimento_storico_carriera_trigger; Type: TRIGGER; Schema: public; Owner: Kevin
+--
+
+CREATE TRIGGER inserimento_storico_carriera_trigger AFTER DELETE ON public.carriera FOR EACH ROW EXECUTE FUNCTION public.inserimento_storico_carriera();
+
+
+--
+-- Name: carriera trig_check_iscrizione_esame; Type: TRIGGER; Schema: public; Owner: Kevin
+--
+
+CREATE TRIGGER trig_check_iscrizione_esame BEFORE INSERT ON public.carriera FOR EACH ROW EXECUTE FUNCTION public.check_iscrizione_esame();
+
+
+--
+-- Name: studente trig_entry_studente_storico; Type: TRIGGER; Schema: public; Owner: Kevin
+--
+
+CREATE TRIGGER trig_entry_studente_storico BEFORE DELETE ON public.studente FOR EACH ROW EXECUTE FUNCTION public.entry_studente_storico();
+
+
+--
+-- Name: studente trigger_inserimento_storico_studente; Type: TRIGGER; Schema: public; Owner: Kevin
+--
+
+CREATE TRIGGER trigger_inserimento_storico_studente BEFORE DELETE ON public.studente FOR EACH ROW EXECUTE FUNCTION public.inserimento_storico_studente();
+
+
+--
+-- Name: carriera carriera_cdl_insegnamento_data_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.carriera
+    ADD CONSTRAINT carriera_cdl_insegnamento_data_fkey FOREIGN KEY (cdl, insegnamento, data) REFERENCES public.esame(cdl, insegnamento, data);
+
+
+--
+-- Name: carriera_storico carriera_storico_cdl_insegnamento_data_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.carriera_storico
+    ADD CONSTRAINT carriera_storico_cdl_insegnamento_data_fkey FOREIGN KEY (cdl, insegnamento, data) REFERENCES public.esame(cdl, insegnamento, data);
+
+
+--
+-- Name: carriera_storico carriera_storico_studente_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.carriera_storico
+    ADD CONSTRAINT carriera_storico_studente_fkey FOREIGN KEY (studente) REFERENCES public.studente(matricola);
+
+
+--
+-- Name: carriera carriera_studente_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.carriera
+    ADD CONSTRAINT carriera_studente_fkey FOREIGN KEY (studente) REFERENCES public.studente(matricola) ON DELETE CASCADE;
+
+
+--
+-- Name: corso_di_laurea corso_di_laurea_responsabile_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.corso_di_laurea
+    ADD CONSTRAINT corso_di_laurea_responsabile_fkey FOREIGN KEY (responsabile) REFERENCES public.docente(id);
+
+
+--
+-- Name: docente docente_utente_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.docente
+    ADD CONSTRAINT docente_utente_fkey FOREIGN KEY (utente) REFERENCES public.utente(nome_utente) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: esame esame_cdl_insegnamento_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.esame
+    ADD CONSTRAINT esame_cdl_insegnamento_fkey FOREIGN KEY (cdl, insegnamento) REFERENCES public.insegnamento(cdl, codice_univoco);
+
+
+--
+-- Name: insegnamento insegnamento_cdl_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.insegnamento
+    ADD CONSTRAINT insegnamento_cdl_fkey FOREIGN KEY (cdl) REFERENCES public.corso_di_laurea(id);
+
+
+--
+-- Name: insegnamento insegnamento_responsabile_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.insegnamento
+    ADD CONSTRAINT insegnamento_responsabile_fkey FOREIGN KEY (responsabile) REFERENCES public.docente(id);
+
+
+--
+-- Name: iscrizione_esame iscrizione_esame_cdl_insegnamento_data_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.iscrizione_esame
+    ADD CONSTRAINT iscrizione_esame_cdl_insegnamento_data_fkey FOREIGN KEY (cdl, insegnamento, data) REFERENCES public.esame(cdl, insegnamento, data) ON DELETE CASCADE;
+
+
+--
+-- Name: iscrizione_esame iscrizione_esame_studente_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.iscrizione_esame
+    ADD CONSTRAINT iscrizione_esame_studente_fkey FOREIGN KEY (studente) REFERENCES public.studente(matricola) ON DELETE CASCADE;
+
+
+--
+-- Name: propedeuticita propedeuticita_cdl_dep_propedeutico_a_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.propedeuticita
+    ADD CONSTRAINT propedeuticita_cdl_dep_propedeutico_a_fkey FOREIGN KEY (cdl_dep, propedeutico_a) REFERENCES public.insegnamento(cdl, codice_univoco);
+
+
+--
+-- Name: propedeuticita propedeuticita_cdl_main_insegnamento_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.propedeuticita
+    ADD CONSTRAINT propedeuticita_cdl_main_insegnamento_fkey FOREIGN KEY (cdl_main, insegnamento) REFERENCES public.insegnamento(cdl, codice_univoco);
+
+
+--
+-- Name: segreteria segreteria_utente_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.segreteria
+    ADD CONSTRAINT segreteria_utente_fkey FOREIGN KEY (utente) REFERENCES public.utente(nome_utente) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: studente studente_cdl_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.studente
+    ADD CONSTRAINT studente_cdl_fkey FOREIGN KEY (cdl) REFERENCES public.corso_di_laurea(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: studente_storico studente_storico_cdl_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.studente_storico
+    ADD CONSTRAINT studente_storico_cdl_fkey FOREIGN KEY (cdl) REFERENCES public.corso_di_laurea(id) ON UPDATE CASCADE;
+
+
+--
+-- Name: studente studente_utente_fkey; Type: FK CONSTRAINT; Schema: public; Owner: Kevin
+--
+
+ALTER TABLE ONLY public.studente
+    ADD CONSTRAINT studente_utente_fkey FOREIGN KEY (utente) REFERENCES public.utente(nome_utente) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- PostgreSQL database dump complete
+--
+

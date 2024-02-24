@@ -45,7 +45,7 @@ function get_teaching_data($id_code, $cdl) {
   $conn = open_pg_connection();
 
   if ($conn) {
-    $query = 'select * from insegnamento where codice_univoco = $1 and corso_di_laurea = $2';
+    $query = 'select * from insegnamento where codice_univoco = $1 and cdl = $2';
     $res = pg_query_params($conn, $query, array($id_code, $cdl));
 
     $result = pg_fetch_assoc($res);
@@ -61,7 +61,7 @@ function get_teaching($cdl) {
   $conn = open_pg_connection();
 
   if ($conn) {
-    $query = 'select * from insegnamento where corso_di_laurea = $1';
+    $query = 'select * from insegnamento where cdl = $1';
     $res = pg_query_params($conn, $query, array($cdl));
 
     if ($res) {
@@ -79,7 +79,7 @@ function get_prerequisites($cdl) {
   $conn = open_pg_connection();
 
   if ($conn) {
-    $query = 'select insegnamento, propedeutico_a from propedeuticita where corso_di_laurea1 = $1';
+    $query = 'select insegnamento, propedeutico_a from propedeuticita where cdl_main = $1';
     $res = pg_query_params($conn, $query, array($cdl));
 
     if ($res) {
@@ -97,7 +97,7 @@ function get_subscribers($codice, $cdl, $data) {
   $conn = open_pg_connection();
 
   if ($conn) {
-    $query = 'select s.nome, s.cognome, s.matricola from studente s join iscrizione_esami ie ON s.matricola = ie.studente where ie.insegnamento = $1 and ie.corso_di_laurea = $2 and ie.data = $3';
+    $query = 'select s.nome, s.cognome, s.matricola from studente s join iscrizione_esame ie ON s.matricola = ie.studente where ie.insegnamento = $1 and ie.cdl = $2 and ie.data = $3';
     $res = pg_query_params($conn, $query, array($codice, $cdl, $data));
 
     if ($res) {
@@ -130,7 +130,7 @@ function get_user_data($user) {
   $conn = open_pg_connection();
 
   if ($conn) {
-    $query = 'select nome_utente, tipo_utente from utente where nome_utente = $1';
+    $query = 'select nome_utente, profilo_utente from utente where nome_utente = $1';
     $res = pg_query_params($conn, $query, array($user));
 
     if ($res) 
@@ -148,10 +148,9 @@ function get_student_data($user) {
   $conn = open_pg_connection();
 
   if ($conn) {
-    $query = 'select matricola, corso_di_laurea, nome, cognome, email from studente where Utente = $1';
+    $query = 'select matricola, cdl, nome, cognome, email from studente where utente = $1';
     $res = pg_query_params($conn, $query, array($user));
 
-    // prelevo il risultato sotto forma di array
     $result = pg_fetch_assoc($res);
 
     pg_close($conn);
@@ -166,10 +165,9 @@ function get_student_data_id($matricola) {
   $conn = open_pg_connection();
 
   if ($conn) {
-    $query = 'select matricola, corso_di_laurea, nome, cognome, email from studente where matricola = $1';
+    $query = 'select matricola, cdl, nome, cognome, email from studente where matricola = $1';
     $res = pg_query_params($conn, $query, array($matricola));
 
-    // prelevo il risultato sotto forma di array
     $result = pg_fetch_assoc($res);
 
     pg_close($conn);
@@ -187,7 +185,6 @@ function get_hist_student_data_from_id($matricola) {
     $query = 'select matricola, corso_di_laurea, nome, cognome, email from storico_studente where matricola = $1';
     $res = pg_query_params($conn, $query, array($matricola));
 
-    // prelevo il risultato sotto forma di array
     $result = pg_fetch_assoc($res);
 
     pg_close($conn);
@@ -241,7 +238,7 @@ function get_teachers_candidates() {
 function get_subscriptions($matricola) {
   $conn = open_pg_connection();
   if ($conn) {
-    $query = 'select * from iscrizione_esami where studente = $1';
+    $query = 'select * from iscrizione_esame where studente = $1';
     $res = pg_query_params($conn, $query, array($matricola));
 
     if ($res) {
@@ -258,7 +255,7 @@ function get_subscriptions($matricola) {
 function get_prerequisites_alt($cdl) {
   $conn = open_pg_connection();
   if ($conn) {
-    $query = 'select * from propedeuticita where corso_di_laurea1 = $1';
+    $query = 'select * from propedeuticita where cdl_main = $1';
     $res = pg_query_params($conn, $query, array($cdl));
 
     if ($res) {
@@ -274,36 +271,34 @@ function get_prerequisites_alt($cdl) {
 
 function get_teaching_name($cdl, $codice) {
   $conn = open_pg_connection();
-  $query = 'select nome from insegnamento where corso_di_laurea = $1 and codice_univoco = $2';
+  $query = 'select nome from insegnamento where cdl = $1 and codice_univoco = $2';
   $res = pg_query_params($conn, $query, array($cdl, $codice));
 
-  // prelevo il risultato sotto forma di array
   $result = pg_fetch_assoc($res);
 
   pg_close($conn);
 
   if ($result) {
-    return $result;
+    return $result['nome'];
   }
 }
 
-function get_nome_corso($id) {
+function get_course_name($id) {
   $conn = open_pg_connection();
 
   $query = 'select nome from corso_di_laurea where id = $1';
   $res = pg_query_params($conn, $query, array($id));
 
-  // prelevo il risultato sotto forma di array
   $result = pg_fetch_assoc($res);
 
   pg_close($conn);
 
   if ($result) {
-    return $result;
+    return $result['nome'];
   }
 }
 
-function get_insegnamenti_per_responsabile($id) {
+function get_teaching_from_responsible($id) {
   $conn = open_pg_connection();
 
   if ($conn) {
@@ -321,11 +316,11 @@ function get_insegnamenti_per_responsabile($id) {
   }
 }
 
-function get_tutti_studenti() {
+function get_all_students() {
   $conn = open_pg_connection();
 
   if ($conn) {
-    $query = 'select matricola, nome, cognome, email from studente union select matricola, nome, cognome, email from storico_studente order by matricola';
+    $query = 'select matricola, nome, cognome, email from studente union select matricola, nome, cognome, email from studente_storico order by matricola';
     $res = pg_query_params($conn, $query, array());
 
     if ($res) {
@@ -339,12 +334,12 @@ function get_tutti_studenti() {
   }
 }
 
-function get_carriera_completa($matricola) {
+function get_career_completed($matricola) {
   $conn = open_pg_connection();
 
   if ($conn) {
     $query =
-    'select c.insegnamento, c.corso_di_laurea, c.data, c.voto, c.esito
+    'select c.insegnamento, c.cdl, c.data, c.voto, c.esito
     from carriera c 
     where c.studente = $1
     order by c.insegnamento, c.data';
@@ -361,13 +356,13 @@ function get_carriera_completa($matricola) {
   }
 }
 
-function get_carriera_valida($matricola) {
+function get_career_ok($matricola) {
   $conn = open_pg_connection();
 
   if ($conn) {
     $query =
-    'select c.insegnamento, c.corso_di_laurea, c.data, c.voto, c.esito
-    from carriera_valida c 
+    'select c.insegnamento, c.cdl, c.data, c.voto, c.esito
+    from carriera_ok c 
     where c.studente = $1';
     $res = pg_query_params($conn, $query, array($matricola));
 
@@ -382,13 +377,13 @@ function get_carriera_valida($matricola) {
   }
 }
 
-function get_carriera_valida_studente_rimosso($matricola) {
+function get_career_ok_removed_student($matricola) {
   $conn = open_pg_connection();
 
   if ($conn) {
     $query =
     'select c.insegnamento, c.corso_di_laurea, c.data, c.voto 
-    from carriera_valida_studenti_rimossi c 
+    from carriera_ok_studenti_rimossi c 
     where c.studente = $1';
     $res = pg_query_params($conn, $query, array($matricola));
 
@@ -403,7 +398,7 @@ function get_carriera_valida_studente_rimosso($matricola) {
   }
 }
 
-function get_carriera_completa_studente_rimosso($matricola) {
+function get_career_completed_removed_student($matricola) {
   $conn = open_pg_connection();
 
   if ($conn) {
@@ -432,7 +427,6 @@ function get_teacher_data($user) {
     $query = 'select id, nome, cognome, email from docente where utente = $1';
     $res = pg_query_params($conn, $query, array($user));
 
-    // prelevo il risultato sotto forma di array
     $result = pg_fetch_assoc($res);
 
     pg_close($conn);
@@ -448,7 +442,7 @@ function get_exams_for_cdl($cdl) {
 
   if ($conn) {
     $query =
-    'select * from esame where corso_di_laurea = $1 order by insegnamento, data';
+    'select * from esame where cdl = $1 order by insegnamento, data';
     $res = pg_query_params($conn, $query, array($cdl));
 
     if ($res) {
@@ -468,7 +462,7 @@ function get_exams($id) {
   if ($conn) {
     $query =
     'select e.*, i.nome
-    from esame e join insegnamento i on e.corso_di_laurea = i.corso_di_laurea and e.insegnamento = i.codice_univoco join docente d on d.id = i.responsabile 
+    from esame e join insegnamento i on e.cdl = i.cdl and e.insegnamento = i.codice_univoco join docente d on d.id = i.responsabile 
     where i.responsabile = $1';
     $res = pg_query_params($conn, $query, array($id));
 
@@ -483,14 +477,13 @@ function get_exams($id) {
   }
 }
 
-function get_teacher_data_for_id($id) {
+function get_teacher_data_from_id($id) {
   $conn = open_pg_connection();
 
   if ($conn) {
     $query = 'select id, nome, cognome from docente where id = $1';
     $res = pg_query_params($conn, $query, array($id));
 
-    // prelevo il risultato sotto forma di array
     $result = pg_fetch_assoc($res);
 
     pg_close($conn);
@@ -581,7 +574,6 @@ function update_teacher($userold, $usernew, $nome, $cognome, $email) {
 
 
   if ($conn) {
-    // Inizia la transazione
     pg_query($conn, 'begin');
     $query = 'update utente set nome_utente = $1 where nome_utente = $2';
     $res = pg_query_params($conn, $query, array($usernew, $userold));
@@ -614,7 +606,6 @@ function update_student($userold, $usernew, $cdl, $nome, $cognome, $email) {
 
 
   if ($conn) {
-    // Inizia la transazione
     pg_query($conn, 'begin');
     $query = 'update utente set nome_utente = $1 where nome_utente = $2';
     $res = pg_query_params($conn, $query, array($usernew, $userold));
@@ -664,14 +655,12 @@ function update_cdl($id, $responsabile, $tipologia, $nome) {
 function update_teaching($codice, $cdl, $responsabile, $nome, $descrizione, $anno) {
   $conn = open_pg_connection();
 
-
   if ($conn) {
-    $query = 'update insegnamento set responsabile = $3, nome = $4, descrizione = $5, anno = $6 where codice_univoco = $1 and corso_di_laurea = $2';
+    $query = 'update insegnamento set responsabile = $3, nome = $4, descrizione = $5, anno = $6 where codice_univoco = $1 and cdl = $2';
     $res = pg_query_params($conn, $query, array($codice, $cdl, $responsabile, $nome, $descrizione, $anno));
 
     if (!$res) {
       $msg = pg_last_error($conn);
-      // $errore = substr($msg, 0, strpos($msg, 'CONTEXT'));
       pg_close($conn);
       return $msg;
     }
@@ -685,19 +674,16 @@ function change_password($user, $old_psw, $new_psw) {
   $conn = open_pg_connection();
 
   if ($conn) {
-    // fai le varie query, allora qua ce molto importante capire come fetcahre gli errori per stampare in caso di errore il messaggio corretto\
-
     $query = 'select password from utente where nome_utente = $1';
     $res = pg_query_params($conn, $query, array($user));
     $result = pg_fetch_result($res, 0, 0);
 
     if ($result != $old_psw) {
       pg_close($conn);
-      // throw new Exception("la password vecchia non e' corretta");
       return false;
     } else {
       $query = 'update utente set password = $1 where nome_utente = $2';
-      $res = pg_query_params($conn, $query, array(md5($new_psw), $user));
+      $res = pg_query_params($conn, $query, array($new_psw, $user));
       if (pg_affected_rows($res) == 1) {
         pg_close($conn);
         return 'ok';
@@ -741,7 +727,7 @@ function remove_prerequisites($insegnamento, $cdl, $propedeutico_a) {
 
 
   if ($conn) {
-    $query = 'delete from propedeuticita where insegnamento = $1 and corso_di_laurea1 = $2 and propedeutico_a = $3';
+    $query = 'delete from propedeuticita where insegnamento = $1 and cdl_main = $2 and propedeutico_a = $3';
     $res = pg_query_params($conn, $query, array($insegnamento, $cdl, $propedeutico_a));
 
     if (!$res) {
@@ -763,7 +749,7 @@ function remove_exam($codice, $cdl, $data) {
   $conn = open_pg_connection();
 
   if ($conn) {
-    $query = 'delete from esame where insegnamento = $1 and corso_di_laurea = $2 and data = $3';
+    $query = 'delete from esame where insegnamento = $1 and cdl = $2 and data = $3';
     $res = pg_query_params($conn, $query, array($codice, $cdl, $data));
 
     if (!$res) {
@@ -785,7 +771,7 @@ function remove_subscription($data, $studente) {
   $conn = open_pg_connection();
 
   if ($conn) {
-    $query = 'delete from iscrizione_esami where data = $1 and studente = $2';
+    $query = 'delete from iscrizione_esame where data = $1 and studente = $2';
     $res = pg_query_params($conn, $query, array($data, $studente));
 
     if (!$res) {
@@ -810,10 +796,8 @@ function insert_teacher($nome_utente, $password, $tipo_utente, $nome, $cognome, 
   $conn = open_pg_connection();
 
   if ($conn) {
-    // Inizia la transazione
     pg_query($conn, 'begin');
 
-    // Esegui la prima query per inserire l'utente
     $query_utente = 'insert into utente VALUES($1, $2, $3)';
     $res = pg_query_params($conn, $query_utente, array($nome_utente, $password, $tipo_utente));
 
@@ -824,7 +808,6 @@ function insert_teacher($nome_utente, $password, $tipo_utente, $nome, $cognome, 
       return $msg;
     }
 
-    // Esegui la seconda query per inserire il docente
     $query_docente = 'insert into docente(utente, nome, cognome, email) VALUES($1, $2, $3, $4)';
     $res_docente = pg_query_params($conn, $query_docente, array($nome_utente, $nome, $cognome, $email));
 
@@ -843,12 +826,11 @@ function insert_teacher($nome_utente, $password, $tipo_utente, $nome, $cognome, 
 
 function insert_exam($data, $codice, $cdl) {
   $conn = open_pg_connection();
-  $query = 'insert into esame(data, insegnamento, corso_di_laurea) values ($1, $2, $3)';
+  $query = 'insert into esame(data, insegnamento, cdl) values ($1, $2, $3)';
   $res = pg_query_params($conn, $query, array($data, $codice, $cdl));
 
   if (!$res) {
     $msg = pg_last_error($conn);
-    // $errore = substr($msg, 0, strpos($msg, 'CONTEXT'));
     pg_close($conn);
     return $msg;
   }
@@ -861,12 +843,11 @@ function insert_prerequisites($insegnamento, $propedeutico_a, $cdl) {
   $conn = open_pg_connection();
 
   if ($conn) {
-    $query = 'insert into propedeuticita(corso_di_laurea1, insegnamento, corso_di_laurea2, propedeutico_a) values ($1, $2, $3, $4)';
-    $res = pg_query_params($conn, $query, array($cdl, $insegnamento, $cdl, $propedeutico_a));
+    $query = 'insert into propedeuticita(cdl_main, cdl_dep, insegnamento, propedeutico_a) values ($1, $2, $3, $4)';
+    $res = pg_query_params($conn, $query, array($cdl, $cdl, $insegnamento, $propedeutico_a));
 
     if (!$res) {
       $msg = pg_last_error($conn);
-      // $errore = substr($msg, 0, strpos($msg, 'CONTEXT'));
       pg_close($conn);
       return $msg;
     }
@@ -878,12 +859,11 @@ function insert_prerequisites($insegnamento, $propedeutico_a, $cdl) {
 
 function insert_mark($codice, $cdl, $data, $studente, $voto) {
   $conn = open_pg_connection();
-  $query = 'insert into carriera(data, insegnamento, corso_di_laurea, studente, voto) values ($1, $2, $3, $4, $5)';
+  $query = 'insert into carriera(data, insegnamento, cdl, studente, voto) values ($1, $2, $3, $4, $5)';
   $res = pg_query_params($conn, $query, array($data, $codice, $cdl, $studente, $voto));
 
   if (!$res) {
     $msg = pg_last_error($conn);
-    // $errore = substr($msg, 0, strpos($msg, 'CONTEXT'));
     pg_close($conn);
     return $msg;
   }
@@ -913,14 +893,12 @@ function insert_cdl($responsabile, $tipologia, $nome) {
 function insert_teaching($cdl, $responsabile, $nome, $descrizione, $anno) {
   $conn = open_pg_connection();
 
-
   if ($conn) {
-    $query = 'insert into insegnamento(corso_di_laurea, responsabile, nome, descrizione, anno) values( $1, $2, $3, $4, $5)';
+    $query = 'insert into insegnamento(cdl, responsabile, nome, descrizione, anno) values( $1, $2, $3, $4, $5)';
     $res = pg_query_params($conn, $query, array($cdl, $responsabile, $nome, $descrizione, $anno));
 
     if (!$res) {
       $msg = pg_last_error($conn);
-      // $errore = substr($msg, 0, strpos($msg, 'CONTEXT'));
       pg_close($conn);
       return $msg;
     }
@@ -951,7 +929,6 @@ function insert_student($nome_utente, $password, $tipo_utente, $cdl, $nome, $cog
 
     if (!$res_studente) {
       $msg = pg_last_error($conn);
-      // if error on transaction -> rollback
       pg_query($conn, 'rollback');
       pg_close($conn);
       return $msg;
@@ -967,7 +944,7 @@ function exam_subscription($codice, $cdl, $matricola, $data) {
   $conn = open_pg_connection();
 
   if ($conn) {
-    $query = 'insert into iscrizione_esami(data, insegnamento, corso_di_laurea, studente) values( $1, $2, $3, $4)';
+    $query = 'insert into iscrizione_esame(data, insegnamento, cdl, studente) values( $1, $2, $3, $4)';
     $res = pg_query_params($conn, $query, array($data, $codice, $cdl, $matricola));
 
     if (!$res) {
@@ -979,4 +956,15 @@ function exam_subscription($codice, $cdl, $matricola, $data) {
     pg_close($conn);
     return 'ok';
   }
+}
+
+
+######################HTML HELPERS ######################
+function show_html_result($s) {
+  $html_result = <<<EOD
+    <div class="d-flex align-items-center justify-content-center" style="height: 150px;">
+    {$s}
+    </div>
+  EOD;
+  echo $html_result;
 }

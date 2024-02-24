@@ -45,7 +45,6 @@ insert into utente (nome_utente, password, profilo_utente) values ('docente24', 
 insert into utente (nome_utente, password, profilo_utente) values ('docente25', 'docente25', 'docente');
 
 -----------------------------Utente: Studente -----------------------------
-insert into utente (nome_utente, password, profilo_utente) values ('admin', 'admin', 'studente');
 insert into utente (nome_utente, password, profilo_utente) values ('studente01', 'studente01', 'studente');
 insert into utente (nome_utente, password, profilo_utente) values ('studente02', 'studente02', 'studente');
 insert into utente (nome_utente, password, profilo_utente) values ('studente03', 'studente03', 'studente');
@@ -165,7 +164,6 @@ insert into corso_di_laurea (responsabile, tipologia, nome) values (9, 'triennal
 insert into corso_di_laurea (responsabile, tipologia, nome) values (10, 'magistrale', 'Ingegneria Biomedica');
 
 -----------------------------Utente: Studente -----------------------------
-insert into studente (cdl, utente, nome, cognome, email) values (1,'admin','admin','admin','admin@studente.it');
 insert into studente (cdl, utente, nome, cognome, email) values (1,'studente01','Luca','Rossi','luca.rossi@studente.it');
 insert into studente (cdl, utente, nome, cognome, email) values (1,'studente02','Maria','Garcia','maria.garcia@studente.it');
 insert into studente (cdl, utente, nome, cognome, email) values (1,'studente03','Mohammed','Khan','mohammed.khan@studente.it');

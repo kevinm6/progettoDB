@@ -1,6 +1,6 @@
 -- Creazione database
 --RAISERROR(N'Test', 16, 1);
-RETURN;
+return;
 create database pgeu_db;
 -- create schema project;
 
@@ -57,18 +57,18 @@ create table insegnamento(
   nome varchar(40) not null,
   descrizione text,
   anno smallint check (anno > 0 and anno < 4) not null,
-  primary key(codice_univoco, corso_di_laurea),
-  unique (corso_di_laurea, nome),
-  foreign key (corso_di_laurea) references corso_di_laurea(id)
+  primary key(codice_univoco, cdl),
+  unique (cdl, nome),
+  foreign key (cdl) references corso_di_laurea(id)
 );
 
 create table esame(
-  corso_di_laurea integer not null,
+  cdl integer not null,
   insegnamento integer not null,
   data date not null,
-  primary key (corso_di_laurea, insegnamento, data),
-  unique(corso_di_laurea, data),
-  foreign key (corso_di_laurea, insegnamento) references insegnamento(corso_di_laurea, codice_univoco)
+  primary key (cdl, insegnamento, data),
+  unique(cdl, data),
+  foreign key (cdl, insegnamento) references insegnamento(cdl, codice_univoco)
 );
 
 create table iscrizione_esame(
@@ -76,8 +76,8 @@ create table iscrizione_esame(
   insegnamento integer not null,
   data date not null,
   studente integer not null,
-  primary key (corso_di_laurea, insegnamento, data, studente),
-  foreign key (corso_di_laurea, insegnamento, data) references esame(corso_di_laurea, insegnamento, data) on delete cascade,
+  primary key (cdl, insegnamento, data, studente),
+  foreign key (cdl, insegnamento, data) references esame(cdl, insegnamento, data) on delete cascade,
   foreign key (studente) references studente(matricola) on delete cascade
 );
 
@@ -93,8 +93,8 @@ create table carriera(
       else 'respinto'
     end
   ) stored,
-  primary key (corso_di_laurea, insegnamento, data, studente),
-  foreign key (corso_di_laurea, insegnamento, data) references esame(corso_di_laurea, insegnamento, data),
+  primary key (cdl, insegnamento, data, studente),
+  foreign key (cdl, insegnamento, data) references esame(cdl, insegnamento, data),
   foreign key (studente) references studente(matricola) on delete cascade
 );
 
@@ -114,25 +114,25 @@ create table carriera_storico(
   studente integer not null,
   voto smallint check ( voto >= 0 and voto <= 30 ) not null,
   esito varchar(8),
-  primary key (corso_di_laurea, insegnamento, data, studente),
-  foreign key (corso_di_laurea, insegnamento, data) references esame(corso_di_laurea, insegnamento, data),
+  primary key (cdl, insegnamento, data, studente),
+  foreign key (cdl, insegnamento, data) references esame(cdl, insegnamento, data),
   foreign key (studente) references studente(matricola)
 );
 
 
 create table propedeuticita(
-  corso_di_laurea_main integer not null,
-  corso_di_laurea_dep integer check ( corso_di_laurea_main = corso_di_laurea_dep ) not null,
-  insegnamento integer not null,
+  cdl_main integer not null,
+  cdl_dep integer check ( cdl_main = cdl_dep ) not null,
+  insegnamento integer notcdl
   propedeutico_a integer check ( insegnamento != propedeutico_a ),
-  primary key (corso_di_laurea_main, insegnamento, propedeutico_a),
-  foreign key (corso_di_laurea_main, insegnamento) references insegnamento(corso_di_laurea, codice_univoco),
-  foreign key (corso_di_laurea_dep, propedeutico_a) references insegnamento(corso_di_laurea, codice_univoco)
+  primary key (cdl_main, insegnamento, propedeutico_a),
+  foreign key (cdl_main, insegnamento) references insegnamento(cdl, codice_univoco),
+  foreign key (cdl_dep, propedeutico_a) references insegnamento(cdl, codice_univoco)
 );
 
 
 -- view per le carriere degli studenti
-create view carriere as
+create view carriera_ok as
   select c.studente, c.insegnamento, c.cdl, c.data, c.voto, c.esito
   from carriera c
   where c.esito = 'superato' and c.data = (
@@ -144,10 +144,84 @@ create view carriere as
   );
 )
 
------------------------------Functions -----------------------------
+-- view per le carriere degli studenti rimossi
+create view carriera_valida_studenti_rimossi as 
+    select c.studente, c.insegnamento, c.cdl, c.data, c.voto, c.esito
+    from carriera_storico c 
+    where c.esito = 'promosso' and c.data = (
+        select max(c1.data)
+        from carriera_storico c1
+        where c1.insegnamento = c.insegnamento
+          and c1.cdl = c.cdl
+          and c1.studente = c.studente
+    );
 
 
------------------------------Triggers -----------------------------
+-----------------------------triggers -----------------------------
+
+create or replace function check_valid_date()
+returns trigger as $$
+begin
+    if new.data < current_date then
+        raise exception 'impossibile inserire un esame con data precedente alla data odierna';
+    end if;
+    return new;
+end;
+$$ language plpgsql;
+
+
+create trigger block_date_enter
+before insert or update on esame
+for each row
+execute function check_valid_date();
+
+
+create or replace function verifica_data_esami_univoca()
+returns trigger as $$
+begin
+    if exists (
+        select 1
+        from esame
+        where cdl = new.cdl
+          and data = new.data
+    ) then
+        raise notice 'non è possibile inserire un record con la stessa data e corso di laurea.';
+    end if;
+    return new;
+end;
+$$ language plpgsql;
+
+-- trigger che inserisce nello storico carriera
+create or replace function inserimento_storico_carriera()
+returns trigger as $$
+begin
+    insert into carriera_storico (data, insegnamento, cdl, studente, voto, esito)
+    values (old.data, old.insegnamento, old.cdl, old.studente, old.voto, old.esito);
+    return old;
+end;
+$$ language plpgsql;
+
+create trigger inserimento_storico_carriera_trigger
+after delete on carriera
+for each row
+execute function inserimento_storico_carriera();
+
+
+create or replace function inserimento_storico_studente()
+returns trigger as $$
+begin
+    insert into studente_storico (matricola, cdl, nome, cognome, e_mail)
+    values (old.matricola, old.cdl, old.nome, old.cognome, old.e_mail);
+    return old;
+end;
+$$ language plpgsql;
+
+create trigger trigger_inserimento_storico_studente
+before delete on studente
+for each row
+execute function inserimento_storico_studente();
+
+
 
 create or replace function hash_password()
 returns trigger as $$
@@ -161,7 +235,7 @@ create trigger hash_password_trigger
 before insert or update on utente
 for each row execute function hash_password();
 
--- Trigger per controllare che un docente puo` avere al massimo 3 insegnamenti di cui è responsabile
+-- trigger per controllare che un docente puo` avere al massimo 3 insegnamenti di cui è responsabile
 create or replace function limite_docente_responsabile_corsi()
 returns trigger as $$
 begin
@@ -169,7 +243,7 @@ begin
     select 1 from corso_di_laurea
     where responsabile = new.responsabile
     and id != new.id
-  ) then raise exception 'Un docente può avere al massimo 3 insegnamenti di cui è responsabile'
+  ) then raise exception 'un docente può avere al massimo 3 insegnamenti di cui è responsabile';
   end if;
   return new;
 end;
@@ -190,6 +264,23 @@ before delete on studente
 for each row execute function entry_studente_storico();
 
 
+create or replace function check_students_dups()
+returns trigger as $$
+begin
+    if exists (
+        select 1 from storico_studente where matricola = new.matricola
+    ) then
+        raise exception 'impossibile inserire: matricola gia'' presente in storico_studente.';
+    end if;
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger avoid_students_dups
+before insert or update on studente
+for each row
+execute function check_students_dups();
+
 -- check_iscrizione_esame e relativo trigger
 create or replace function check_iscrizione_esame()
 returns trigger as $$
@@ -205,9 +296,9 @@ begin
     where data = new.data
       and insegnamento = new.insegnamento
       and cdl = new.cdl
-      and studente = new.studente
+      and studente = new.studente;
   else
-    raise exception "Nessuna iscrizione trovata per l'esame."
+    raise exception 'nessuna iscrizione trovata per esame.';
   end if;
   return new;
 end;
@@ -216,3 +307,4 @@ $$ language plpgsql;
 create trigger trig_check_iscrizione_esame
 before insert on carriera
 for each row execute check_iscrizione_esame();
+

@@ -67,31 +67,33 @@
 
     // check if POST method -> user clicked "Login" button
     if ($_SERVER["REQUEST_METHOD"] == "POST") {
-      if (isset($_POST['user'], $_POST['pswd'])) {
+      if (isset($_POST['user'], $_POST['pswd'], $_POST['profile'])) {
         $auth = login($_POST['user'], $_POST['pswd']);
 
         // show error on unsuccessful login
         if (!$auth) {
-          show_html_result("<div class='p-3 mb-3 text-bg-danger rounded-1'>Errore: nome_utente o password errati</div>");
+          show_html_result("<div class='p-3 mb-3 text-bg-danger rounded-1'>Errore: nome utente o password errati o profilo non selezionato</div>");
           exit();
         } else {
-          error_log("✅ Successful login, redirecting...\n");
+
+          // FIX: security bug: user try to access with different profile and not save profile until successful login
+          if (!$_POST['profile']) {
+            show_html_result("<div class='p-3 mb-3 text-bg-danger rounded-1'>Errore profilo utente selezionato. Riprova.</div>");
+            session_unset();
+            exit();
+          } elseif ($auth['profilo_utente'] != $_POST['profile']) {
+            show_html_result("<div class='p-3 mb-3 text-bg-warning rounded-1'>Utente presente nel database ma non corrispondente al profilo selezionato.\nSelezionare il profilo corretto e riprovare.</div>");
+            session_unset();
+            exit();
+          }
 
           // save user data on successful login
           $_SESSION['nome_utente'] = $auth['nome_utente'];
-          $_SESSION['profilo_utente'] = $_POST['profile'];
+          $_SESSION['profilo_utente'] = $auth['profilo_utente'];
 
-          if ($_POST['profile'] == null) {
-            echo <<<EOD
-            <div class="d-flex align-items-center justify-content-center" style="height: 150px;">
-              <div class="p-3 mb-3 text-bg-danger rounded-1">Errore profilo utente selezionato. Riprova.</div>
-            </div>
-            EOD;
-            return;
-          }
-
+          error_log("✅ Successful login, redirecting...\n");
           // load profile-relative user homepage
-          header("Location: {$_SESSION['profilo_utente']}/{$_SESSION['profilo_utente']}.php");
+          header("Location: {$auth['profilo_utente']}/{$auth['profilo_utente']}.php");
         }
       }
     }

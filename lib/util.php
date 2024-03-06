@@ -182,7 +182,7 @@ function get_hist_student_data_from_id($matricola) {
   $conn = open_pg_connection();
 
   if ($conn) {
-    $query = 'select matricola, corso_di_laurea, nome, cognome, email from storico_studente where matricola = $1';
+    $query = 'select matricola, cdl, nome, cognome, email from studente_storico where matricola = $1';
     $res = pg_query_params($conn, $query, array($matricola));
 
     $result = pg_fetch_assoc($res);
@@ -221,7 +221,7 @@ function get_teachers_candidates() {
   $conn = open_pg_connection();
 
   if ($conn) {
-    $query = 'select id, nome, cognome from docente where id NOT IN( select d.id from docente d join corso_di_laurea c on d.id = c.responsabile)';
+    $query = 'select id, nome, cognome from docente where id not in(select d.id from docente d join corso_di_laurea c on d.id = c.responsabile)';
     $res = pg_query_params($conn, $query, array());
 
     if ($res) {
@@ -382,7 +382,7 @@ function get_career_ok_removed_student($matricola) {
 
   if ($conn) {
     $query =
-    'select c.insegnamento, c.corso_di_laurea, c.data, c.voto 
+    'select c.insegnamento, c.cdl, c.data, c.voto 
     from carriera_ok_studenti_rimossi c 
     where c.studente = $1';
     $res = pg_query_params($conn, $query, array($matricola));
@@ -403,8 +403,8 @@ function get_career_completed_removed_student($matricola) {
 
   if ($conn) {
     $query =
-    'select c.insegnamento, c.corso_di_laurea, c.data, c.voto, c.esito
-    from storico_carriera c 
+    'select c.insegnamento, c.cdl, c.data, c.voto, c.esito
+    from carriera_storico c 
     where c.studente = $1
     order by c.data';
     $res = pg_query_params($conn, $query, array($matricola));
@@ -557,7 +557,7 @@ function check_student($matricola) {
       return 'attivo';
     }
 
-    $query = 'select matricola from storico_studente where matricola = $1';
+    $query = 'select matricola from studente_storico where matricola = $1';
     $res = pg_query_params($conn, $query, array($matricola));
     $result = pg_fetch_assoc($res);
 
@@ -617,7 +617,7 @@ function update_student($userold, $usernew, $cdl, $nome, $cognome, $email) {
       return $msg;
     }
 
-    $query_studente = 'update studente set corso_di_laurea = $5, nome = $2, cognome = $3, email = $4 where utente = $1';
+    $query_studente = 'update studente set cdl = $5, nome = $2, cognome = $3, email = $4 where utente = $1';
     $res_studente = pg_query_params($conn, $query_studente, array($usernew, $nome, $cognome, $email, $cdl));
 
     if (!$res_studente) {
@@ -924,7 +924,7 @@ function insert_student($nome_utente, $password, $tipo_utente, $cdl, $nome, $cog
       return $msg;
     }
 
-    $query_student = 'insert into studente(corso_di_laurea, utente, nome, cognome, email) values($1, $2, $3, $4, $5)';
+    $query_student = 'insert into studente(cdl, utente, nome, cognome, email) values($1, $2, $3, $4, $5)';
     $res_studente = pg_query_params($conn, $query_student, array($cdl, $nome_utente, $nome, $cognome, $email));
 
     if (!$res_studente) {

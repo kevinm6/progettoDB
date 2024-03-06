@@ -123,7 +123,7 @@ session_start();
                         break;
 
                     default:
-                        $show_result = "<div class='p-3 mb-3 text-bg-danger rounded-1'><?php {$result}; ?></div>";
+                        $show_result = "<div class='p-3 mb-3 text-bg-danger rounded-1'>{$result}</div>";
                         break;
                 }
                 show_html_result($show_result);

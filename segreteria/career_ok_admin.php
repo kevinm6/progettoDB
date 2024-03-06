@@ -92,7 +92,11 @@ session_start();
                     $i = get_teaching_data($c['insegnamento'], $c['cdl']); ?>
               <tr>
                   <td style="text-align: center;"><?php echo $i['nome']; ?></td>
-                  <td style="text-align: center;"><?php echo $c['data']; ?></td>
+                  <td style="text-align: center;"><?php
+                  $date = new DateTime($c['data']);
+                  $fmt_date = $date->format('d M Y');
+                  echo $fmt_date;;
+                  ?></td>
                   <td style="text-align: center;"><?php echo $c['voto']; ?></td>
               </tr>
             <?php } ?>

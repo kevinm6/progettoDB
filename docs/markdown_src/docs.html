@@ -1,0 +1,150 @@
+
+<hr />
+<p>File          : documentazione_tecnica.md<br />
+Author        : Kevin Manca<br />
+Matricola     : 978578<br />
+output        :</p>
+<h2>pdf_document: default</h2>
+<h1>Documentazione Tecnica</h1>
+
+<hr />
+<h2>Progetto Basi di Dati</h2>
+<p><strong>PGEU</strong>: <strong>P</strong>iattaforma per la <strong>G</strong>estione degli <strong>E</strong>sami <strong>U</strong>niversitari</p>
+
+<hr />
+<p>Gli schemi <strong>logico</strong> ed <strong>E-R</strong> si trovano nella cartella <code>/docs</code> con il loro relativo nome  </p>
+<p><a href="./schema_logico.pdf">Schema logico</a> &rarr; <code>./schema_logico.pdf</code>  </p>
+<p><a href="./ER_schema.pdf">Schema E-R</a> &rarr; <code>./ER_schema.pdf</code>  </p>
+
+<hr />
+<h3>Entità</h3>
+<table><thead><tr><th align='center'>Entità</th><th align='center'>Identificatore</th><th align='center'>Attributi</th><th>Descrizione</th></tr></thead><tbody><tr><td align='center'>Utente</td><td align='center'><strong>profilo_utente</strong>, <strong>nome_utente</strong>, <strong>password</strong></td><td align='center'>nome_utente, profilo_utente, password</td><td>utente generico della web-app</td></tr><tr><td align='center'>Segreteria</td><td align='center'><strong>id</strong></td><td align='center'>id, nome, cognome</td><td>personale della segreteria</td></tr><tr><td align='center'>Docente</td><td align='center'><strong>id</strong></td><td align='center'><strong>id</strong>, <strong>nome</strong>, <strong>cognome</strong>, <strong>email</strong></td><td>personale docente</td></tr><tr><td align='center'>Studente</td><td align='center'><strong>matricola</strong></td><td align='center'>matricola, nome, cognome, email</td><td>studenti</td></tr><tr><td align='center'>Corso di Laurea</td><td align='center'><strong>nome</strong>, <strong>tipologia</strong></td><td align='center'>nome, tipologia</td><td>un corso di laurea</td></tr><tr><td align='center'>Insegnamento</td><td align='center'><strong>codice_univoco</strong>, <strong>nome(cdl)</strong>, <strong>tipologia(cdl)</strong></td><td align='center'>codice univoco, nome, descrizione, anno</td><td>insegnamento specifico per un corso di laurea</td></tr><tr><td align='center'>Esame</td><td align='center'><strong>data</strong></td><td align='center'>data, insegnamento.codice_univoco, cdl.id</td><td>esame di uno specifico insegnamento</td></tr><tr><td align='center'>Studente_storico</td><td align='center'><strong>matricola</strong></td><td align='center'><strong>nome</strong>, <strong>cognome</strong>, <strong>email</strong></td><td>informazioni di uno studente rimosso</td></tr></tbody></table><h3>Relazioni</h3>
+<table><thead><tr><th align='center'>Relazione</th><th align='center'>Entità coinvolte</th><th align='center'>Attributi</th><th>Descrizione</th></tr></thead><tbody><tr><td align='center'>login_segreteria</td><td align='center'>Utente(1, 1), Segreteria(1, 1)</td><td align='center'>nome_utente, profilo_utente, password</td><td>utente segreteria con relativi privilegi</td></tr><tr><td align='center'>login_docente</td><td align='center'>Utente(1, 1), Docente(1, 1)</td><td align='center'>id, nome, cognome</td><td>utente docente con relative funzioni specifiche</td></tr><tr><td align='center'>login_studente</td><td align='center'>Utente(1, 1), Studente(1, 1)</td><td align='center'><strong>id</strong>, <strong>nome</strong>, <strong>cognome</strong>, <strong>email</strong></td><td>utente studente con le funzioni relative</td></tr><tr><td align='center'>calendario</td><td align='center'>Insegnamento(0, N), Esame(1, 1)</td><td align='center'>-</td><td>calendario degli esami</td></tr><tr><td align='center'>iscrizione</td><td align='center'>Corso di laurea(0, N), Studente(1, 1)</td><td align='center'>anno</td><td>associa uno studente al corso di laurea a cui è iscritto</td></tr><tr><td align='center'>iscrizione_esame</td><td align='center'>Studente(0, N), Esame(0, N)</td><td align='center'>nome, tipologia</td><td>associa gli studenti agli esami a cui sono iscritti</td></tr><tr><td align='center'>iscrizione_passata</td><td align='center'>Corso di laurea(0, N), Storico_studente(1, 1)</td><td align='center'>nome, tipologia</td><td>studente rimosso associato corso_di_laurea a cui era iscritto</td></tr><tr><td align='center'>carriera</td><td align='center'>Studente(0, N), Esame(0, N)</td><td align='center'>voto, esito</td><td>associa studenti ed esami, con informazioni sul voto ottenuto per gli studenti che hanno sostenuto un dato esame</td></tr><tr><td align='center'>carriera_storico</td><td align='center'>Studente_storico(0, N), Esame(0, N)</td><td align='center'>voto, esito</td><td>come l'altra carriera ma per studenti rimossi</td></tr><tr><td align='center'>compone</td><td align='center'><strong>data</strong>, <strong>Insegnamento.codice_univoco</strong>, <strong>corso_di_laurea.id</strong></td><td align='center'>-</td><td>associa un insegnamento ad un corso di laurea di cui fa parte</td></tr><tr><td align='center'>responsabile_cdl</td><td align='center'>Docente(0, 1), Corso_di_Laurea(1, 1)</td><td align='center'>-</td><td>associa un docente ad un corso di laurea di cui è responsabile</td></tr><tr><td align='center'>responsabile_insegnamento</td><td align='center'>Docente(0, 3), Insegnamento(1, 1)</td><td align='center'>-</td><td>associa un docente ad un insegnamento del quale è responsabile</td></tr><tr><td align='center'>propedeuticità</td><td align='center'>Insegnamento(0, N), Insegnamento(0, N)</td><td align='center'>-</td><td>associa un insegnamento agli insegnamenti di cui è propedeutico</td></tr></tbody></table>
+<hr />
+<h4>Vincoli dei dati</h4>
+<p>Dalla specifica richiesta sono stati considerati i seguenti vincoli:</p>
+<ol>
+<li>L'attributo tipologia può assumere i valori "triennale" o "magistrale"  </li>
+<li>Ogni docente è responsabile di al massimo 3 insegnamenti e massimo 1 corso di laurea  </li>
+<li>Uno studente può iscriversi ad un esame relativo ad un insegnamento solo se ha superato tutti gli
+esami propedeutici ad esso  </li>
+<li>uno studente può sostentere un esame relativo ad un insegnamento solo se è previsto dal suo CdL  </li>
+<li>esami relativi ad insegnamenti dello stesso CdL non possono avere la medesima data  </li>
+<li>L'attributo profilo_utente può assumere solo uno dei valori tra "studente", "docente", "segreteria"  </li>
+<li>L'attributo esito deve avere un valore positivo se >= 18 o negativo se &lt; 18 e comunque compreso
+tra 0 e 30  </li>
+<li>Un utente può partecipare all'associazione login solo relativa al suo profilo_utente
+corrispondente</li>
+</ol>
+
+<hr />
+<h5>Scelte implementative</h5>
+<p>La maggior parte delle scelte implementative sono state dettate dalla specifica. <br /><br />
+L'entità <strong>Utente</strong> rappresenta il generico utente della web-app, identificato univocamente attraverso <br /><br />
+l'attributo <strong>nome_utente</strong>; è costituito dagli altri attributi che ne facilitano il<br />
+funzionamento dell'app stessa come <strong>password</strong> e il <strong>profilo_utente</strong>. <br /><br />
+Per la <strong>segreteria</strong>, l'attributo <strong>id</strong> è quello che permette di identificare il personale univocamente. <br /><br />
+Per l'entità <strong>studente</strong> l'attributo <strong>matricola</strong> è sicuramente quello che lo identifica meglio e in <br /><br />
+modo univoco, poi gli altri attributi aggiungono semplicemente delle informazioni. <br /><br />
+Per i <strong>docenti</strong>, un <strong>codice</strong> <strong>identificativo</strong> è la scelta per identificarli in modo univoco, dovuto <br /><br />
+principalmente alla soluzione personalmente più opportuna rispetto ad altri attributi. <br /><br />
+L'entità <strong>Esame</strong> è identificato univocamente attraverso l'attributo <strong>data</strong>, in quanto per i vincoli, <br /><br />
+non possono esserci due appelli dello stesso insegnamento nella stessa data.  </p>
+<p><strong>Relazioni e cardinalità</strong></p>
+<ul>
+<li><p><strong>login_studente</strong></p>
+<ul>
+<li>Utente (1,1): ad un utente è associato uno studente</li>
+<li>Studente (1,1): ad uno studente è associato un Utente</li>
+</ul>
+</li>
+<li><p><strong>login_docente</strong></p>
+<ul>
+<li>Utente (1,1): ad un utente è associato un docente</li>
+<li>Docente (1,1): ad un docente è associato un utente</li>
+</ul>
+</li>
+<li><p><strong>login_segreteria</strong></p>
+<ul>
+<li>Utente (1,1): ad un Utente e' associato una sola Segreteria</li>
+<li>Segreteria (1,1): una Segreteria e' associata ad un solo Utente.</li>
+</ul>
+</li>
+<li><p><strong>iscrizione</strong></p>
+<ul>
+<li>Studente (1, 1): in quanto uno studente è obbligatoriamente iscritto ad uno e uno solo corso di laurea</li>
+<li>Corso di laurea (0, N) <br />
+<ul>
+<li>min 0: corso di laurea con nessun studente iscritto  </li>
+<li>max N: nessun limite imposto per il numero di studenti a un cdl (no numero chiuso)  </li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>calendario</strong></p>
+<ul>
+<li>Insegnamento (0,N): nessuna data di esame o N</li>
+<li>Esame (1,1): è riferito ad un solo insegnamento</li>
+</ul>
+</li>
+<li><p>carriera:</p>
+<ul>
+<li>Studente (0,N): uno studente con nessun esame dato o N</li>
+<li>Esame (0,N): un esame sostenuto da nessuno studente o N</li>
+</ul>
+</li>
+<li><p><strong>compone</strong></p>
+<ul>
+<li>Corso di laurea (1,N): corso di laurea ha almeno un insegnamento o N</li>
+<li>Insegnamento (1,1): un insegnamento fa riferimento ad un unico cdl</li>
+</ul>
+</li>
+<li><p><strong>iscrizione_esami</strong></p>
+<ul>
+<li>Studente (0,N): studente iscritto a nessun esame o N</li>
+<li>Esame (0,N): esame con nessun iscritto o N</li>
+</ul>
+</li>
+<li><p><strong>storico_carriera</strong></p>
+<ul>
+<li>Studente_storico (0,N): uno studente con nessun esame sostenuto o N</li>
+<li>Esame (0,N): un esame sostenuto da nessuno studente o N</li>
+</ul>
+</li>
+<li><p><strong>propedeuticità</strong></p>
+<ul>
+<li>insegnamento (0,N)</li>
+<li>min 0: un insegnamento può non essere propedeutico ad altri insegnamenti e può non avere propedeuticità</li>
+<li>max N: un insegnamento può essere propedeutico a più insegnamenti e avere più propedeuticità</li>
+</ul>
+</li>
+<li><p><strong>responsabilita' insegnamento</strong></p>
+<ul>
+<li>Docente (0,3): un docente può non essere responsabile di insegnamenti o averne al massimo 3  </li>
+<li>Insegnamento (1,1): un insegnamento deve avere al massimo un responsabile</li>
+</ul>
+</li>
+<li><p><strong>responsabilità corso</strong></p>
+<ul>
+<li>Corso di laurea (1,1): un corso di laurea ha obbligatoriamente e uno e un solo responsabile</li>
+<li>Docente (0,1): un docente può non essere responsabile di un cdl, ma al massimo lo è di uno</li>
+</ul>
+</li>
+<li><p><strong>carriera</strong></p>
+<ul>
+<li>Studente (0,N): uno studente può non aver sostenuto esami o averne sostenuti N</li>
+<li>Esame (0,N): un esame può non essere stato sostenuto da nessuno o da N studenti</li>
+</ul>
+</li>
+<li><p><strong>iscrizione_passata</strong></p>
+<ul>
+<li>Storico_studente (1,1): uno studente deve essere iscritto ad uno e un solo cdl</li>
+<li>Corso di laurea (0,N):
+<ul>
+<li>min 0: cdl senza studenti iscritti</li>
+<li>max N: nessun limite di studenti iscritti ad un cdl (no numero chiuso)</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>

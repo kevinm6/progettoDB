@@ -69,7 +69,7 @@ if (isset($_GET['cdl'])) {
             $r = get_teacher_data_from_id($i['responsabile']) ?>
         <tr>
           <td><?php echo $i['codice_univoco']; ?></td>
-          <td><?php echo 'ID(' . $r['id'] . ') ' . $r['nome'] . $r['cognome']; ?></td>
+          <td><?php echo "ID({$r['id']}) {$r['nome']} {$r['cognome']}"; ?></td>
           <td><?php echo $i['nome']; ?></td>
           <td><?php echo $i['descrizione']; ?></td>
           <td><?php echo $i['anno']; ?></td>

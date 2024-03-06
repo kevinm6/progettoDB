@@ -68,7 +68,7 @@ create table esame(
   data date not null,
   primary key (cdl, insegnamento, data),
   unique(cdl, data),
-  foreign key (cdl, insegnamento) references insegnamento(cdl, codice_univoco)
+  foreign key (cdl, insegnamento) references insegnamento(codice_univoco, cdl)
 );
 
 create table iscrizione_esame(
@@ -116,14 +116,14 @@ create table carriera_storico(
   esito varchar(8),
   primary key (cdl, insegnamento, data, studente),
   foreign key (cdl, insegnamento, data) references esame(cdl, insegnamento, data),
-  foreign key (studente) references studente(matricola)
+  foreign key (studente) references studente_storico(matricola)
 );
 
 
 create table propedeuticita(
   cdl_main integer not null,
   cdl_dep integer check ( cdl_main = cdl_dep ) not null,
-  insegnamento integer notcdl
+  insegnamento integer not null
   propedeutico_a integer check ( insegnamento != propedeutico_a ),
   primary key (cdl_main, insegnamento, propedeutico_a),
   foreign key (cdl_main, insegnamento) references insegnamento(cdl, codice_univoco),
@@ -148,7 +148,7 @@ create view carriera_ok as
 create view carriera_valida_studenti_rimossi as 
     select c.studente, c.insegnamento, c.cdl, c.data, c.voto, c.esito
     from carriera_storico c 
-    where c.esito = 'promosso' and c.data = (
+    where c.esito = 'superato' and c.data = (
         select max(c1.data)
         from carriera_storico c1
         where c1.insegnamento = c.insegnamento
@@ -191,6 +191,55 @@ begin
 end;
 $$ language plpgsql;
 
+create trigger trigger_verifica_data_esami_univoca
+before insert or update on esame
+for each row
+execute function verifica_data_esami_univoca();
+
+create or replace function check_valid_subscription()
+returns trigger as $$
+declare
+studente_cdl integer;
+n_propedeuticita integer;
+n_esami_promossi integer;
+begin
+    -- ottieni il corso di laurea dello studente
+    
+    select corso_di_laurea into studente_cdl
+    from studente
+    where matricola = new.studente;
+    
+    -- controllo che lo studente sia iscritto al corso di laurea dell'esame a cui si vuole iscrivere
+    if studente_cdl != new.cdl then
+        raise exception 'lo studente non appartiene al CdL dell esame selezionato.';
+    end if;
+
+    -- conto il numero di esami propedeutici all'esame che ci si vuole iscrivere
+    select count(*) into n_propedeuticita
+    from propedeuticita
+    where propedeutico_a = new.insegnamento;
+
+    -- conto il numero di esami promossi per lo studente che si vuole iscrivere tra quelli propedeutici all'esame a cui si vuole iscrivere
+    -- controllo questo tramite un join tra carriera_valida (per non avere voti duplicati) e propedeuticita'
+    select count(*) into n_esami_promossi
+    from propedeuticita p join carriera_valida c on p.cdl_main = c.corso_di_laurea and p.insegnamento = c.insegnamento
+    where c.studente = new.studente and p.cdl_main = new.cdl and p.propedeutico_a = new.insegnamento and c.esito = 'superato';
+    
+    -- se i 2 numeri non coincidono sollevo un eccezione
+    if n_propedeuticita != n_esami_promossi then
+        raise exception 'studente non idoneo a iscriversi, non ha superato tutti gli esami propedeutici.';
+    end if;
+
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger trigger_check_valid_subscription
+before insert on iscrizione_esami
+for each row
+execute function check_valid_subscription();
+
+
 -- trigger che inserisce nello storico carriera
 create or replace function inserimento_storico_carriera()
 returns trigger as $$
@@ -210,8 +259,8 @@ execute function inserimento_storico_carriera();
 create or replace function inserimento_storico_studente()
 returns trigger as $$
 begin
-    insert into studente_storico (matricola, cdl, nome, cognome, e_mail)
-    values (old.matricola, old.cdl, old.nome, old.cognome, old.e_mail);
+    insert into studente_storico (matricola, cdl, nome, cognome, email)
+    values (old.matricola, old.cdl, old.nome, old.cognome, old.email);
     return old;
 end;
 $$ language plpgsql;
@@ -249,6 +298,28 @@ begin
 end;
 $$ language plpgsql;
 
+create or replace function controllo_numero_responsabile_insegnamenti()
+returns trigger as $$
+declare
+    total_insegnamenti integer;
+begin
+    select count(*) into total_insegnamenti
+    from insegnamento
+    where responsabile = new.responsabile;
+
+    if total_insegnamenti >= 3  and new.responsabile != old.responsabile then
+        raise exception 'un docente non puo essere responsabile di più di 3 insegnamenti.';
+    end if;
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger trigger_controllo_numero_responsabile_insegnamenti
+before insert or update on insegnamento
+for each row
+execute function controllo_numero_responsabile_insegnamenti();
+
+
 -- trigger inserimento studente_storico
 create or replace function entry_studente_storico()
 returns trigger as $$
@@ -268,9 +339,9 @@ create or replace function check_students_dups()
 returns trigger as $$
 begin
     if exists (
-        select 1 from storico_studente where matricola = new.matricola
+        select 1 from studente_storico where matricola = new.matricola
     ) then
-        raise exception 'impossibile inserire: matricola gia'' presente in storico_studente.';
+        raise exception 'impossibile inserire: la matricola è presente in studente_storico.';
     end if;
     return new;
 end;
@@ -280,6 +351,33 @@ create trigger avoid_students_dups
 before insert or update on studente
 for each row
 execute function check_students_dups();
+
+create or replace function check_valid_year()
+returns trigger as $$
+declare
+    tipologia_corso tipologia_corso;
+begin
+    select tipologia into tipologia_corso
+    from corso_di_laurea
+    where id = new.cdl;
+    
+    if tipologia_corso = 'triennale' and (new.anno < 1 or new.anno > 3) then
+        raise exception 'attributo anno deve essere compreso tra 1 e 3 per i corsi triennali';
+    end if;
+    
+    if tipologia_corso = 'magistrale' and (new.anno < 1 or new.anno > 2) then
+        raise exception 'attributo anno deve essere compreso tra 1 e 2 per i corsi magistrali';
+    end if;
+    
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger trigger_controlla_validita_anno
+before insert or update on insegnamento
+for each row
+execute function check_valid_year();
+
 
 -- check_iscrizione_esame e relativo trigger
 create or replace function check_iscrizione_esame()
@@ -308,3 +406,18 @@ create trigger trig_check_iscrizione_esame
 before insert on carriera
 for each row execute check_iscrizione_esame();
 
+
+create or replace function check_valid_requirements()
+returns trigger as $$
+begin
+    if (select anno from insegnamento where codice_univoco = new.insegnamento) >= (select anno from insegnamento where codice_univoco = new.propedeutico_a) then
+        raise exception 'insegnamento propedeutico non puo essere di un anno successivo';
+    end if;
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger trigger_check_valid_requirements
+before insert or update on propedeuticita
+for each row
+execute function check_valid_requirements();

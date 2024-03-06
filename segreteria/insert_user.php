@@ -71,12 +71,12 @@ if (isset($_GET['profilo_utente']) && $_GET['profilo_utente'] == 'studente') {
           <input type="text" class="form-control" id="nome" name="nome">
         </div>
         <div class="mb-3">
-          <label for="cognome" class="form-label">cognome</label>
+          <label for="cognome" class="form-label">Cognome</label>
           <input type="text" class="form-control" id="cognome" name="cognome">
         </div>
         <div class="mb-3">
-          <label for="e-mail" class="form-label">e-mail</label>
-          <input type="text" class="form-control" id="e-mail" name="e-mail">
+          <label for="email" class="form-label">e-mail</label>
+          <input type="text" class="form-control" id="email" name="email">
         </div>
         <button type="submit" class="btn btn-primary">Invia</button>
 
@@ -105,12 +105,12 @@ if (isset($_GET['profilo_utente']) && $_GET['profilo_utente'] == 'docente') {
           <input type="text" class="form-control" id="nome" name="nome">
         </div>
         <div class="mb-3">
-          <label for="cognome" class="form-label">cognome</label>
+          <label for="cognome" class="form-label">Cognome</label>
           <input type="text" class="form-control" id="cognome" name="cognome">
         </div>
         <div class="mb-3">
-          <label for="e-mail" class="form-label">e-mail</label>
-          <input type="text" class="form-control" id="e-mail" name="e-mail">
+          <label for="email" class="form-label">e-mail</label>
+          <input type="text" class="form-control" id="email" name="email">
         </div>
         <button type="submit" class="btn btn-primary">Conferma</button>
 
@@ -119,7 +119,7 @@ if (isset($_GET['profilo_utente']) && $_GET['profilo_utente'] == 'docente') {
     </div>
 
     <?php
-        if (isset($_POST) && isset($_POST['nome_utente']) && isset($_POST['password']) && isset($_POST['nome']) && isset($_POST['cognome']) && isset($_POST['e-mail'])) {
+        if (isset($_POST) && isset($_POST['nome_utente']) && isset($_POST['password']) && isset($_POST['nome']) && isset($_POST['cognome']) && isset($_POST['email'])) {
             // per evitare errori e sfruttare la funzione di rollback di SQL,
             //
             // inserisco utente e relativamente studente o docente tramite una transazione, in modo che se una delle due operazioni fallisce eseguo un rollback
@@ -128,23 +128,22 @@ if (isset($_GET['profilo_utente']) && $_GET['profilo_utente'] == 'docente') {
             } else {
                 $result = insert_student($_POST['nome_utente'], $_POST['password'], 'studente', $_POST['cdl'], $_POST['nome'], $_POST['cognome'], $_POST['email']);
             }
+            $show_result = null;
 
             switch ($result) {
                 case null:
                     $show_result = "<div class='p-3 mb-3 text-bg-danger rounded-1'>errore nell'inserimento</div>";
-                    show_html_result($show_result);
                     break;
 
                 case 'ok':
                     $show_result = "<div class='p-3 mb-3 text-bg-success rounded-1'>inserimento riuscito</div>";
-                    show_html_result($show_result);
                     break;
 
                 default:
-                    $show_result = "<div class='p-3 mb-3 text-bg-danger rounded-1'>{$result}; ?></div>";
-                    show_html_result($show_result);
+                    $show_result = "<div class='p-3 mb-3 text-bg-danger rounded-1'>{$result}</div>";
                     break;
             }
+            show_html_result($show_result);
 
             unset($_SESSION['update_user']);
         }

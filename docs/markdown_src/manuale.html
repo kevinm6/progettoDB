@@ -1,0 +1,52 @@
+
+<hr />
+<p>File          : manuale_utente.md<br />
+Author        : Kevin Manca<br />
+output        :</p>
+<h2>pdf_document: default</h2>
+<h1>Manuale Utente di PGEU</h1>
+<!--toc:start--><ul>
+<li><a href="#manuale-utente-di-pgeu">Manuale Utente di PGEU</a>
+<ul>
+<li><a href="#requisiti-minimi">Requisiti minimi</a>
+<!--toc:end--></li>
+</ul>
+</li>
+</ul>
+
+<hr />
+<blockquote>
+<p>Il seguente manuale utente è relativo al progetto del corso di Basi di Dati</p>
+</blockquote>
+
+<hr />
+<h2>Requisiti minimi</h2>
+<ul>
+<li><strong>php 8+</strong></li>
+<li><strong>postgres 15.x</strong></li>
+</ul>
+<blockquote>
+<p>Nota <br /><br />
+PHP integra già un web server nelle versioni più recenti. <br /><br />
+Tuttavia nel caso in cui non si possieda una versione abbastanza aggiornata di PHP <br /><br />
+è necessario installare anche un Web Server (come <a href="https://httpd.apache.org">Apache</a>) e <br /><br />
+configurarlo in modo da potersi interfacciare con PHP come indicato nella documentazione del <br /><br />
+software stesso.<br />
+Il progetto non è stato testato in versioni precedenti dei software indicati, <br /><br />
+quindi il relativo funzionamento pogtrebbe essere compromesso.</p>
+</blockquote>
+
+<hr />
+<h3>Setup</h3>
+<p>Se i requisiti indicati sono soddisfatti, è sufficiente:</p>
+<ul>
+<li>estrarre il contenuto dell'archivio  </li>
+<li>posizionarsi nella cartella di root <code>cd BDLAB_978578_MancaKevin</code></li>
+<li>modificare i parametri del file <code>.env</code> contenente la configurazione del Database (se necessario)  </li>
+<li>eseguire il restore del db tramite <code>pg_restore -U Kevin -d pgeu_db db_dumps/db.dump</code></li>
+<li>avviare il server PHP (dalla directory root, con il file <strong>index.php</strong>)
+<ul>
+<li>eseguendo il commando <code>php -S localhost:9000</code> o specificando una porta diversa dalla <em>9000</em></li>
+</ul>
+</li>
+</ul>

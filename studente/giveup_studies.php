@@ -37,7 +37,7 @@
       <h6 class="text-center text-secondary text-opacity-75">Continuando l'utente verrà rimosso e non sarà più possibile effettuare il login.</h6>
       <br>
           <div class="d-flex mt-3 align-items-center justify-content-center">
-        <a href=<?php echo("rinuncia.php?nome_utente={$_SESSION['nome_utente']}"); ?> class="btn btn-danger" style="width: 250px"
+        <a href=<?php echo("giveup.php?nome_utente={$_SESSION['nome_utente']}"); ?> class="btn btn-danger" style="width: 250px"
           onclick="return confirm('Confermi rimozione utente?')"
         >Rimuovi Utente</a>
           </div>

@@ -1,6 +1,5 @@
 -- Creazione database
 --RAISERROR(N'Test', 16, 1);
-return;
 create database pgeu_db;
 -- create schema project;
 
@@ -68,7 +67,7 @@ create table esame(
   data date not null,
   primary key (cdl, insegnamento, data),
   unique(cdl, data),
-  foreign key (cdl, insegnamento) references insegnamento(codice_univoco, cdl)
+  foreign key (cdl, insegnamento) references insegnamento(cdl, codice_univoco)
 );
 
 create table iscrizione_esame(
@@ -126,8 +125,8 @@ create table propedeuticita(
   insegnamento integer not null
   propedeutico_a integer check ( insegnamento != propedeutico_a ),
   primary key (cdl_main, insegnamento, propedeutico_a),
-  foreign key (cdl_main, insegnamento) references insegnamento(cdl, codice_univoco),
-  foreign key (cdl_dep, propedeutico_a) references insegnamento(cdl, codice_univoco)
+  foreign key (cdl_main, insegnamento) references insegnamento(codice_univoco, cdl),
+  foreign key (cdl_dep, propedeutico_a) references insegnamento(codice_univoco, cdl)
 );
 
 
@@ -145,16 +144,16 @@ create view carriera_ok as
 )
 
 -- view per le carriere degli studenti rimossi
-create view carriera_valida_studenti_rimossi as 
-    select c.studente, c.insegnamento, c.cdl, c.data, c.voto, c.esito
-    from carriera_storico c 
-    where c.esito = 'superato' and c.data = (
-        select max(c1.data)
-        from carriera_storico c1
-        where c1.insegnamento = c.insegnamento
-          and c1.cdl = c.cdl
-          and c1.studente = c.studente
-    );
+create view carriera_ok_studenti_rimossi as 
+  select c.studente, c.insegnamento, c.cdl, c.data, c.voto, c.esito
+  from carriera_storico c 
+  where c.esito = 'superato' and c.data = (
+    select max(c1.data)
+    from carriera_storico c1
+    where c1.insegnamento = c.insegnamento
+      and c1.cdl = c.cdl
+      and c1.studente = c.studente
+);
 
 
 -----------------------------triggers -----------------------------
@@ -222,7 +221,7 @@ begin
     -- conto il numero di esami promossi per lo studente che si vuole iscrivere tra quelli propedeutici all'esame a cui si vuole iscrivere
     -- controllo questo tramite un join tra carriera_valida (per non avere voti duplicati) e propedeuticita'
     select count(*) into n_esami_promossi
-    from propedeuticita p join carriera_valida c on p.cdl_main = c.corso_di_laurea and p.insegnamento = c.insegnamento
+    from propedeuticita p join carriera_ok c on p.cdl_main = c.corso_di_laurea and p.insegnamento = c.insegnamento
     where c.studente = new.studente and p.cdl_main = new.cdl and p.propedeutico_a = new.insegnamento and c.esito = 'superato';
     
     -- se i 2 numeri non coincidono sollevo un eccezione
@@ -235,7 +234,7 @@ end;
 $$ language plpgsql;
 
 create trigger trigger_check_valid_subscription
-before insert on iscrizione_esami
+before insert on iscrizione_esame
 for each row
 execute function check_valid_subscription();
 
@@ -284,20 +283,28 @@ create trigger hash_password_trigger
 before insert or update on utente
 for each row execute function hash_password();
 
--- trigger per controllare che un docente puo` avere al massimo 3 insegnamenti di cui è responsabile
-create or replace function limite_docente_responsabile_corsi()
+
+-- trigger per controllare che un docente puo` avere al massimo 1 CdL di cui è responsabile
+create or replace function limite_docente_responsabile_cdl()
 returns trigger as $$
 begin
   if exists (
     select 1 from corso_di_laurea
     where responsabile = new.responsabile
     and id != new.id
-  ) then raise exception 'un docente può avere al massimo 3 insegnamenti di cui è responsabile';
+  ) then raise exception 'un docente può avere al massimo 1 CdL di cui è responsabile';
   end if;
   return new;
 end;
 $$ language plpgsql;
 
+create trigger trigger_controllo_responsabilita_cdl
+before insert or update on corso_di_laurea
+for each row
+execute function limite_docente_responsabile_cdl();
+
+
+-- trigger per controllare che un docente puo` avere al massimo 3 insegnamenti di cui è responsabile
 create or replace function controllo_numero_responsabile_insegnamenti()
 returns trigger as $$
 declare
@@ -410,7 +417,7 @@ for each row execute check_iscrizione_esame();
 create or replace function check_valid_requirements()
 returns trigger as $$
 begin
-    if (select anno from insegnamento where codice_univoco = new.insegnamento) >= (select anno from insegnamento where codice_univoco = new.propedeutico_a) then
+    if (select anno from insegnamento where codice_univoco = new.insegnamento) > (select anno from insegnamento where codice_univoco = new.propedeutico_a) then
         raise exception 'insegnamento propedeutico non puo essere di un anno successivo';
     end if;
     return new;

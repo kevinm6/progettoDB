@@ -14,10 +14,10 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-KK94CHFLLe+nY2dmCWGMq91rCGa5gtU4mk92HdvYe+M/SXH301p5ILy+dN9+nJOZ" crossorigin="anonymous">
   </head>
   <body>
-    <div class="container-fluid pb-3" style="background-color: lightgray; text-anchor: middle; text-align: center; border-radius: 20px;">
+    <div class="container-fluid pb-3" style="background-color: lightgray; box-sizing: border-box; padding-top: 10px; text-anchor: middle; border-radius: 20px;">
       <div class="row">
         <div class="d-flex align-items-center justify-content-center">
-          <h1>Piattaforma Gestione Esami Universitari</h1>
+          <h1><b>P</b>iattaforma <b>G</b>estione <b>E</b>sami <b>U</b>niversitari</h1>
         </div>
       </div>
     </div>
@@ -67,18 +67,18 @@
 
     // check if POST method -> user clicked "Login" button
     if ($_SERVER["REQUEST_METHOD"] == "POST") {
-      if (isset($_POST['user'], $_POST['pswd'], $_POST['profile'])) {
+      if (isset($_POST['user'], $_POST['pswd'])) {
         $auth = login($_POST['user'], $_POST['pswd']);
 
         // show error on unsuccessful login
         if (!$auth) {
-          show_html_result("<div class='p-3 mb-3 text-bg-danger rounded-1'>Errore: nome utente o password errati o profilo non selezionato</div>");
+          show_html_result("<div class='p-3 mb-3 text-bg-danger rounded-1'>Errore: nome utente o password errati</div>");
           exit();
         } else {
 
           // FIX: security bug: user try to access with different profile and not save profile until successful login
-          if (!$_POST['profile']) {
-            show_html_result("<div class='p-3 mb-3 text-bg-danger rounded-1'>Errore profilo utente selezionato. Riprova.</div>");
+          if ($_POST['profile'] == "Seleziona profilo") {
+            show_html_result("<div class='p-3 mb-3 text-bg-danger rounded-1'>Errore: profilo utente non selezionato. Riprova.</div>");
             session_unset();
             exit();
           } elseif ($auth['profilo_utente'] != $_POST['profile']) {

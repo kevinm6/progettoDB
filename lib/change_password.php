@@ -135,16 +135,13 @@ if (!isset($password_changed) || !$password_changed) {
   const new_pswd_in = document.getElementById('new-pswd');
   const bnt_change_pswd = document.getElementById('btn_change_pswd');
 
-  let pswds_in = false;
   new_pswd_in.addEventListener('input', ev => {
     if (old_pswd_in.value != "" && new_pswd_in.value != "") {
-      console.log(ev);
       bnt_change_pswd.removeAttribute('disabled');
     } else {
       bnt_change_pswd.disabled = true;
     }
   });
-
 </script>
 </html>
 
